@@ -1,0 +1,12 @@
+{
+  "name": "Gusmeroli — Strumento Visite",
+  "short_name": "Visite",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2C2926",
+  "theme_color": "#2C2926",
+  "icons": [
+    { "src": "icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
