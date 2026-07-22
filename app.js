@@ -1,6 +1,6 @@
 // ===== PASSWORD =====
 // Per cambiare la password: genera il nuovo hash SHA-256 (es. via console del browser
-// con crypto.subtle) e sostituisci PASSWORD_HASH qui sotto. Password attuale: Gusmeroli2026
+// con crypto.subtle) e sostituisci PASSWORD_HASH qui sotto.
 const PASSWORD_HASH = "3fe3f3424c3647c23c88c82e815f3628748bf0a4871651a46ee0b2b0fc77420e";
 const UNLOCK_KEY = "gv_unlocked_v1";
 
