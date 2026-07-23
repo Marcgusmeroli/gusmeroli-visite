@@ -403,7 +403,6 @@ function showPanel(name){
     document.getElementById(PANEL_CARDS[key]).style.display = key === name ? "" : "none";
   });
   document.querySelectorAll(".panel-tab").forEach(btn => btn.classList.toggle("active", btn.dataset.panel === name));
-  document.getElementById(PANEL_CARDS[name]).scrollIntoView({ behavior:"smooth", block:"nearest" });
 }
 
 document.querySelectorAll(".panel-tab").forEach(btn => {

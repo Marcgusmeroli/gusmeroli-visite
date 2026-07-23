@@ -112,6 +112,11 @@ main{max-width:820px;margin:0 auto;padding:22px 18px 80px;}
   }
   .panel-tab .badge{display:none;}
   .panel-tab[data-panel="conto"]{font-size:12px;padding:9px 4px;font-weight:800;}
+  /* badge nascosto su mobile: porto il colore di stato sul pulsante stesso */
+  .panel-tab[data-panel="trattativa"].stato-offerta{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .panel-tab[data-panel="trattativa"].stato-trattativa{background:var(--good);border-color:var(--good);color:#fff;}
+  .panel-tab[data-panel="conto"].roi-pos{border-color:var(--good);}
+  .panel-tab[data-panel="conto"].roi-neg{border-color:var(--warn);}
   .check-item{gap:8px;}
   .check-status{min-width:100px;font-size:11px;padding:7px 8px;}
   .check-select{min-width:112px;padding:8px 8px;}
