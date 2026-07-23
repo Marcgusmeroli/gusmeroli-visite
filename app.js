@@ -358,8 +358,6 @@ const STATO_OPTIONS = [
   { key:"valutazione", label:"Da valutare" },
   { key:"offerta",      label:"Offerta fatta" },
   { key:"trattativa",   label:"In trattativa" },
-  { key:"vinta",        label:"Vinta" },
-  { key:"persa",        label:"Persa / scartata" },
 ];
 let trattativaStato = "valutazione";
 let allegatoDataUrl = null;
