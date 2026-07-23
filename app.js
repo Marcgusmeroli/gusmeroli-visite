@@ -246,6 +246,169 @@ document.getElementById("prezzoMq").addEventListener("input", e => e.target.data
 aggiornaZona();
 
 
+// ===== CHECKLIST SOPRALLUOGO =====
+const CHECKLIST_ITEMS = [
+  { key:"elettrico",   label:"Impianto elettrico",              group:"Impianti" },
+  { key:"idraulico",   label:"Impianto idraulico",               group:"Impianti" },
+  { key:"riscaldamento",label:"Riscaldamento / climatizzazione", group:"Impianti" },
+  { key:"umidita",     label:"Umidità / muffa",                  group:"Stato immobile" },
+  { key:"infissi",     label:"Infissi",                          group:"Stato immobile" },
+  { key:"facciata",    label:"Facciata / tetto",                 group:"Stato immobile" },
+  { key:"rumore",      label:"Rumore / esposizione",             group:"Stato immobile" },
+  { key:"catasto",     label:"Conformità catastale / planimetria",group:"Documenti" },
+  { key:"ape",         label:"Classe energetica (APE)",          group:"Documenti" },
+  { key:"vincoli",     label:"Vincoli (paesaggistico/storico)",  group:"Documenti" },
+  { key:"abusi",       label:"Abusi edilizi visibili",           group:"Documenti" },
+  { key:"piano",       label:"Piano e ascensore",                group:"Contesto" },
+  { key:"spesearretrate",label:"Spese condominiali arretrate",   group:"Contesto" },
+  { key:"parcheggio",  label:"Parcheggio / box",                 group:"Contesto" },
+];
+const CHECK_STATES = ["", "ok", "attenzione", "problema"];
+const CHECK_LABELS = { "":"Da valutare", ok:"OK", attenzione:"Da verificare", problema:"Problema" };
+let checklistState = {};
+
+function buildChecklist(){
+  const wrap = document.getElementById("checklistGroups");
+  const groups = [...new Set(CHECKLIST_ITEMS.map(i => i.group))];
+  wrap.innerHTML = groups.map(g => `
+    <div class="check-group">
+      <div class="check-group-lbl">${g}</div>
+      ${CHECKLIST_ITEMS.filter(i => i.group === g).map(i => `
+        <div class="check-item">
+          <span>${i.label}</span>
+          <button type="button" class="check-status" data-key="${i.key}" data-state="">Da valutare</button>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+  wrap.querySelectorAll(".check-status").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      const cur = CHECK_STATES.indexOf(checklistState[key] || "");
+      const next = CHECK_STATES[(cur + 1) % CHECK_STATES.length];
+      checklistState[key] = next;
+      btn.dataset.state = next;
+      btn.textContent = CHECK_LABELS[next];
+      updateChecklistBadge();
+    });
+  });
+}
+
+function updateChecklistBadge(){
+  const total = CHECKLIST_ITEMS.length;
+  const compiled = CHECKLIST_ITEMS.filter(i => checklistState[i.key]).length;
+  const problemi = CHECKLIST_ITEMS.filter(i => checklistState[i.key] === "problema").length;
+  const badge = document.getElementById("checklistBadge");
+  const toggle = document.getElementById("checklistToggle");
+  badge.textContent = `${compiled}/${total}`;
+  toggle.classList.toggle("has-issue", problemi > 0);
+  toggle.classList.toggle("all-ok", problemi === 0 && compiled === total);
+}
+
+function resetChecklistUI(){
+  checklistState = {};
+  buildChecklist();
+  updateChecklistBadge();
+  document.getElementById("checklistNote").value = "";
+}
+
+function applyChecklistState(saved){
+  checklistState = Object.assign({}, saved || {});
+  buildChecklist();
+  document.querySelectorAll(".check-status").forEach(btn => {
+    const st = checklistState[btn.dataset.key] || "";
+    btn.dataset.state = st;
+    btn.textContent = CHECK_LABELS[st];
+  });
+  updateChecklistBadge();
+}
+
+buildChecklist();
+updateChecklistBadge();
+
+document.getElementById("checklistToggle").addEventListener("click", () => {
+  const card = document.getElementById("checklistCard");
+  card.style.display = card.style.display === "none" ? "" : "none";
+  if (card.style.display !== "none") card.scrollIntoView({ behavior:"smooth", block:"nearest" });
+});
+
+
+// ===== TRATTATIVA =====
+const STATO_OPTIONS = [
+  { key:"valutazione", label:"Da valutare" },
+  { key:"offerta",      label:"Offerta fatta" },
+  { key:"trattativa",   label:"In trattativa" },
+  { key:"vinta",        label:"Vinta" },
+  { key:"persa",        label:"Persa / scartata" },
+];
+let trattativaStato = "valutazione";
+let allegatoDataUrl = null;
+
+function buildStatoPills(){
+  const wrap = document.getElementById("statoPills");
+  wrap.innerHTML = STATO_OPTIONS.map(s =>
+    `<button type="button" class="status-pill${s.key === trattativaStato ? " active" : ""}" data-stato="${s.key}">${s.label}</button>`
+  ).join("");
+  wrap.querySelectorAll(".status-pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      trattativaStato = btn.dataset.stato;
+      wrap.querySelectorAll(".status-pill").forEach(b => b.classList.toggle("active", b.dataset.stato === trattativaStato));
+    });
+  });
+}
+buildStatoPills();
+
+function setAllegato(dataUrl){
+  allegatoDataUrl = dataUrl;
+  const preview = document.getElementById("allegatoPreview");
+  const img = document.getElementById("allegatoImg");
+  if (dataUrl){
+    img.src = dataUrl;
+    preview.style.display = "";
+  } else {
+    img.src = "";
+    preview.style.display = "none";
+  }
+}
+
+// Ridimensiona/comprime l'immagine lato client (localStorage ha spazio limitato).
+function comprimiImmagine(file, maxSide, quality){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > maxSide){ height = Math.round(height * maxSide / width); width = maxSide; }
+      else if (height > maxSide){ width = Math.round(width * maxSide / height); height = maxSide; }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+document.getElementById("allegatoInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const label = document.getElementById("allegatoLabel");
+  const orig = label.textContent;
+  label.textContent = "Elaborazione...";
+  try {
+    const dataUrl = await comprimiImmagine(file, 1280, 0.72);
+    setAllegato(dataUrl);
+  } catch(e){
+    alert("Non sono riuscito a leggere il file. Riprova con un'altra foto.");
+  }
+  label.textContent = orig;
+  e.target.value = "";
+});
+document.getElementById("allegatoRemove").addEventListener("click", () => setAllegato(null));
+
+
 // ===== TABS =====
 function setTab(tab){
   document.getElementById("tabNew").classList.toggle("active", tab === "new");
@@ -275,6 +438,11 @@ function raccogliScheda(){
     indirizzo: document.getElementById("indirizzo").value,
     citta: document.getElementById("citta").value,
     descrizione: document.getElementById("descrizione").value,
+    checklist: Object.assign({}, checklistState),
+    checklistNote: document.getElementById("checklistNote").value,
+    trattativaStato: trattativaStato,
+    trattativaNote: document.getElementById("trattativaNote").value,
+    allegato: allegatoDataUrl,
     ...c
   };
 }
@@ -302,6 +470,12 @@ document.getElementById("btnReset").addEventListener("click", () => {
   formatAllGrouped();
   calcola();
   aggiornaZona();
+  resetChecklistUI();
+  document.getElementById("checklistCard").style.display = "none";
+  trattativaStato = "valutazione";
+  buildStatoPills();
+  document.getElementById("trattativaNote").value = "";
+  setAllegato(null);
 });
 
 document.getElementById("btnShare").addEventListener("click", async () => {
@@ -309,6 +483,8 @@ document.getElementById("btnShare").addEventListener("click", async () => {
   const indirizzo = document.getElementById("indirizzo").value || "Immobile";
   const citta = document.getElementById("citta").value;
   const descrizione = document.getElementById("descrizione").value;
+  const statoLbl = (STATO_OPTIONS.find(s => s.key === trattativaStato) || {}).label || "";
+  const problemi = CHECKLIST_ITEMS.filter(i => checklistState[i.key] === "problema").map(i => i.label);
   const testo = `${indirizzo}${citta ? ", " + citta : ""}\n${descrizione || ""}\n\n` +
     `Superficie: ${c.mq} mq\n` +
     `Acquisto: ${fmtEuro(c.acquisto)} (${isFinite(c.acquistoMq) ? c.acquistoMq.toLocaleString("it-IT",{maximumFractionDigits:0}) : "—"} €/mq)\n` +
@@ -317,7 +493,9 @@ document.getElementById("btnShare").addEventListener("click", async () => {
     `Ricavo stimato: ${fmtEuro(c.ricavo)} (${c.prezzoMq} €/mq)\n` +
     `Utile stimato: ${fmtEuro(c.utile)}\n` +
     `ROI: ${fmtPct(c.roi)}\n` +
-    `Capitale al rogito: ${fmtEuro(c.capitaleRogito)}`;
+    `Capitale al rogito: ${fmtEuro(c.capitaleRogito)}\n` +
+    `\nTrattativa: ${statoLbl}` +
+    (problemi.length ? `\n⚠ Problemi rilevati: ${problemi.join(", ")}` : "");
 
   if (navigator.share){
     try { await navigator.share({ title: indirizzo, text: testo }); } catch(e){}
@@ -337,16 +515,21 @@ function renderSaved(){
   el.innerHTML = list.map(v => {
     const dt = new Date(v.data);
     const dataStr = dt.toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"});
+    const statoInfo = STATO_OPTIONS.find(s => s.key === v.trattativaStato);
+    const problemi = CHECKLIST_ITEMS.filter(i => (v.checklist || {})[i.key] === "problema").length;
     return `
       <div class="visit-item" data-id="${v.id}">
         <div class="vi-top">
           <div class="vi-addr">${v.indirizzo || "Senza indirizzo"}</div>
           <div class="vi-date">${dataStr}</div>
         </div>
-        <div class="vi-sub">${v.citta || ""}${v.descrizione ? " · " + v.descrizione : ""}</div>
+        <div class="vi-sub">${v.citta || ""}${v.descrizione ? " · " + v.descrizione : ""}
+          ${statoInfo ? `<span class="vi-stato ${statoInfo.key}">${statoInfo.label}</span>` : ""}
+        </div>
         <div class="vi-stats">
           <span>Utile <b>${fmtEuro(v.utile)}</b></span>
           <span>ROI <b>${fmtPct(v.roi)}</b></span>
+          ${problemi ? `<span class="vi-issue">⚠ ${problemi} problem${problemi > 1 ? "i" : "a"}</span>` : ""}
         </div>
       </div>
     `;
@@ -383,6 +566,12 @@ function renderSaved(){
       formatAllGrouped();
       calcola();
       aggiornaZona();
+      applyChecklistState(v.checklist);
+      document.getElementById("checklistNote").value = v.checklistNote || "";
+      trattativaStato = v.trattativaStato || "valutazione";
+      buildStatoPills();
+      document.getElementById("trattativaNote").value = v.trattativaNote || "";
+      setAllegato(v.allegato || null);
       setTab("new");
     });
   });
