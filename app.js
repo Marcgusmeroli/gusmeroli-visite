@@ -279,7 +279,9 @@ const CHECKLIST_ITEMS = [
   { key:"umidita",      label:"Umidità / muffa",                   group:"Stato immobile", opts:"presenza" },
   { key:"infissi",      label:"Infissi",                           group:"Stato immobile", opts:"cond" },
   { key:"facciata",     label:"Facciata / tetto",                  group:"Stato immobile", opts:"cond" },
-  { key:"rumore",       label:"Rumore / esposizione",              group:"Stato immobile", opts:"livello" },
+  { key:"rumore",       label:"Rumore",                            group:"Stato immobile", opts:"livello" },
+  { key:"esposizione",  label:"Esposizione",                       group:"Stato immobile", type:"select",
+    choices:["Nord","Sud","Est","Ovest","Nord-Est","Nord-Ovest","Sud-Est","Sud-Ovest"] },
   { key:"catasto",      label:"Conformità catastale / planimetria",group:"Documenti",      opts:"doc" },
   { key:"ape",          label:"Classe energetica (APE)",           group:"Documenti",      opts:"doc" },
   { key:"vincoli",      label:"Vincoli (paesaggistico/storico)",   group:"Documenti",      opts:"doc" },
@@ -310,9 +312,19 @@ function buildChecklist(){
         <div class="check-item piano-item">
           <span>${i.label}</span>
           <div class="piano-controls">
-            <input type="text" class="piano-input" id="pianoInput" placeholder="Piano (es. 2°)" value="${pianoText.replace(/"/g,'&quot;')}">
             <button type="button" class="check-status piano-asc" data-key="${i.key}" data-tone="${optTone(i,val)}">${val ? "Ascensore: " + optLabel(i,val) : "Ascensore?"}</button>
+            <input type="text" class="piano-input" id="pianoInput" placeholder="Piano (es. 2°)" value="${pianoText.replace(/"/g,'&quot;')}">
           </div>
+        </div>`;
+        }
+        if (i.type === "select"){
+          return `
+        <div class="check-item">
+          <span>${i.label}</span>
+          <select class="check-select" data-key="${i.key}">
+            <option value="">—</option>
+            ${i.choices.map(c => `<option value="${c}" ${val === c ? "selected" : ""}>${c}</option>`).join("")}
+          </select>
         </div>`;
         }
         return `
@@ -338,6 +350,9 @@ function buildChecklist(){
         : (next ? optLabel(item, next) : "Da valutare");
       updateChecklistBadge();
     });
+  });
+  wrap.querySelectorAll(".check-select").forEach(sel => {
+    sel.addEventListener("change", () => { checklistState[sel.dataset.key] = sel.value; });
   });
   const pi = document.getElementById("pianoInput");
   if (pi) pi.addEventListener("input", e => pianoText = e.target.value);
