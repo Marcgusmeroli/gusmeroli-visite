@@ -115,6 +115,7 @@ function calcola(){
   utileEl.classList.toggle("neg", utile < 0);
   const roiEl = document.getElementById("rRoi").closest(".result-item");
   roiEl.classList.toggle("neg", roi < 0);
+  updateContoBadge(roi);
 
   return { mq, prezzoMq, acquisto, notaio, geometra, speseCond, arredo, interior, corrente,
     ristrutturazioneMq, aliquotaImposte, aliquotaAgenzia, imposte, agenzia, ristrutturazione, totale, ricavo, utile, roi, capitaleRogito, acquistoMq };
@@ -299,10 +300,10 @@ function updateChecklistBadge(){
   const compiled = CHECKLIST_ITEMS.filter(i => checklistState[i.key]).length;
   const problemi = CHECKLIST_ITEMS.filter(i => checklistState[i.key] === "problema").length;
   const badge = document.getElementById("checklistBadge");
-  const toggle = document.getElementById("checklistToggle");
+  const tab = document.querySelector('.panel-tab[data-panel="checklist"]');
   badge.textContent = `${compiled}/${total}`;
-  toggle.classList.toggle("has-issue", problemi > 0);
-  toggle.classList.toggle("all-ok", problemi === 0 && compiled === total);
+  tab.classList.toggle("has-issue", problemi > 0);
+  tab.classList.toggle("all-ok", problemi === 0 && compiled === total);
 }
 
 function resetChecklistUI(){
@@ -326,10 +327,29 @@ function applyChecklistState(saved){
 buildChecklist();
 updateChecklistBadge();
 
-document.getElementById("checklistToggle").addEventListener("click", () => {
-  const card = document.getElementById("checklistCard");
-  card.style.display = card.style.display === "none" ? "" : "none";
-  if (card.style.display !== "none") card.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+// ===== SELETTORE PAGINA (Checklist / Trattativa / Conto economico) =====
+const PANEL_CARDS = { checklist:"checklistCard", trattativa:"trattativaCard", conto:"contoEconomicoCard" };
+
+function updateContoBadge(roi){
+  const badge = document.getElementById("contoBadge");
+  const tab = document.querySelector('.panel-tab[data-panel="conto"]');
+  if (!badge || !tab) return;
+  badge.textContent = fmtPct(roi);
+  tab.classList.toggle("roi-pos", isFinite(roi) && roi >= 0);
+  tab.classList.toggle("roi-neg", isFinite(roi) && roi < 0);
+}
+
+function showPanel(name){
+  Object.keys(PANEL_CARDS).forEach(key => {
+    document.getElementById(PANEL_CARDS[key]).style.display = key === name ? "" : "none";
+  });
+  document.querySelectorAll(".panel-tab").forEach(btn => btn.classList.toggle("active", btn.dataset.panel === name));
+  document.getElementById(PANEL_CARDS[name]).scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+
+document.querySelectorAll(".panel-tab").forEach(btn => {
+  btn.addEventListener("click", () => showPanel(btn.dataset.panel));
 });
 
 
@@ -344,6 +364,15 @@ const STATO_OPTIONS = [
 let trattativaStato = "valutazione";
 let allegatoDataUrl = null;
 
+function updateTrattativaBadge(){
+  const info = STATO_OPTIONS.find(s => s.key === trattativaStato) || STATO_OPTIONS[0];
+  const badge = document.getElementById("trattativaBadge");
+  const tab = document.querySelector('.panel-tab[data-panel="trattativa"]');
+  badge.textContent = info.label;
+  tab.classList.toggle("stato-vinta", trattativaStato === "vinta");
+  tab.classList.toggle("stato-persa", trattativaStato === "persa");
+}
+
 function buildStatoPills(){
   const wrap = document.getElementById("statoPills");
   wrap.innerHTML = STATO_OPTIONS.map(s =>
@@ -353,10 +382,12 @@ function buildStatoPills(){
     btn.addEventListener("click", () => {
       trattativaStato = btn.dataset.stato;
       wrap.querySelectorAll(".status-pill").forEach(b => b.classList.toggle("active", b.dataset.stato === trattativaStato));
+      updateTrattativaBadge();
     });
   });
 }
 buildStatoPills();
+updateTrattativaBadge();
 
 function setAllegato(dataUrl){
   allegatoDataUrl = dataUrl;
@@ -471,11 +502,12 @@ document.getElementById("btnReset").addEventListener("click", () => {
   calcola();
   aggiornaZona();
   resetChecklistUI();
-  document.getElementById("checklistCard").style.display = "none";
   trattativaStato = "valutazione";
   buildStatoPills();
+  updateTrattativaBadge();
   document.getElementById("trattativaNote").value = "";
   setAllegato(null);
+  showPanel("conto");
 });
 
 document.getElementById("btnShare").addEventListener("click", async () => {
@@ -570,8 +602,10 @@ function renderSaved(){
       document.getElementById("checklistNote").value = v.checklistNote || "";
       trattativaStato = v.trattativaStato || "valutazione";
       buildStatoPills();
+      updateTrattativaBadge();
       document.getElementById("trattativaNote").value = v.trattativaNote || "";
       setAllegato(v.allegato || null);
+      showPanel("conto");
       setTab("new");
     });
   });

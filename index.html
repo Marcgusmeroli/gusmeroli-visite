@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 <title>Gusmeroli — Strumento Visite</title>
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -39,9 +39,11 @@
 
       <div class="section-head">
         <div class="section-title">Immobile</div>
-        <button type="button" class="checklist-toggle" id="checklistToggle">
-          <span>Checklist</span><span class="badge" id="checklistBadge">0/14</span>
-        </button>
+        <div class="panel-tabs" id="panelTabs">
+          <button type="button" class="panel-tab" data-panel="checklist">Checklist<span class="badge" id="checklistBadge">0/14</span></button>
+          <button type="button" class="panel-tab" data-panel="trattativa">Trattativa<span class="badge" id="trattativaBadge">Da valutare</span></button>
+          <button type="button" class="panel-tab active" data-panel="conto">Conto economico<span class="badge" id="contoBadge">—</span></button>
+        </div>
       </div>
       <div class="card">
         <div class="field">
@@ -73,110 +75,113 @@
         </div>
       </div>
 
-      <div class="section-title">Trattativa</div>
-      <div class="card">
-        <div class="field">
-          <label>Stato</label>
-          <div class="status-pills" id="statoPills"></div>
-        </div>
-        <div class="field">
-          <label>Note trattativa</label>
-          <textarea id="trattativaNote" rows="3" placeholder="Es. offerta 165.000 €, controproposta venditore, scadenze..."></textarea>
-        </div>
-        <div class="field">
-          <label>Allega proposta</label>
-          <label class="file-btn" for="allegatoInput" id="allegatoLabel">📎 Scegli foto o scatta</label>
-          <input type="file" id="allegatoInput" accept="image/*" capture="environment" style="display:none">
-          <div id="allegatoPreview" class="allegato-preview" style="display:none">
-            <img id="allegatoImg" alt="Allegato proposta">
-            <button type="button" id="allegatoRemove" class="allegato-remove">Rimuovi allegato</button>
+      <div id="trattativaCard" style="display:none">
+        <div class="card">
+          <div class="field">
+            <label>Stato</label>
+            <div class="status-pills" id="statoPills"></div>
+          </div>
+          <div class="field">
+            <label>Note trattativa</label>
+            <textarea id="trattativaNote" rows="3" placeholder="Es. offerta 165.000 €, controproposta venditore, scadenze..."></textarea>
+          </div>
+          <div class="field">
+            <label>Allega proposta</label>
+            <label class="file-btn" for="allegatoInput" id="allegatoLabel">📎 Scegli foto o scatta</label>
+            <input type="file" id="allegatoInput" accept="image/*" capture="environment" style="display:none">
+            <div id="allegatoPreview" class="allegato-preview" style="display:none">
+              <img id="allegatoImg" alt="Allegato proposta">
+              <button type="button" id="allegatoRemove" class="allegato-remove">Rimuovi allegato</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="section-title">Zona &amp; quotazioni</div>
-      <div class="card">
-        <div id="zoneBox" class="zone-box empty">Inserisci via e città per cercare la zona OMI</div>
-        <div class="linkrow" id="linkRow"></div>
-      </div>
+      <div id="contoEconomicoCard">
+        <div class="section-title">Zona &amp; quotazioni</div>
+        <div class="card">
+          <div id="zoneBox" class="zone-box empty">Inserisci via e città per cercare la zona OMI</div>
+          <div class="linkrow" id="linkRow"></div>
+        </div>
 
-      <div class="section-title">Costi</div>
-      <div class="card">
-        <div class="field key">
-          <label>Prezzo di acquisto (€)</label>
-          <input type="text" id="acquisto" placeholder="400.000" inputmode="numeric">
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label>Aliquota imposte (%)</label>
-            <input type="number" id="aliquotaImposte" value="9" step="0.01" inputmode="decimal">
+        <div class="section-title">Costi</div>
+        <div class="card">
+          <div class="field key">
+            <label>Prezzo di acquisto (€)</label>
+            <input type="text" id="acquisto" placeholder="400.000" inputmode="numeric">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Aliquota imposte (%)</label>
+              <input type="number" id="aliquotaImposte" value="9" step="0.01" inputmode="decimal">
+            </div>
+            <div class="field">
+              <label>Aliquota agenzia (%)</label>
+              <input type="number" id="aliquotaAgenzia" value="4.88" step="0.01" inputmode="decimal">
+            </div>
+          </div>
+          <div class="calc-row">
+            <div class="l">Imposte <span style="color:var(--sub)">(aliquota × acquisto + 100)</span></div>
+            <div class="v" id="calcImposte">— €</div>
+          </div>
+          <div class="calc-row">
+            <div class="l">Agenzia <span style="color:var(--sub)">(aliquota × acquisto)</span></div>
+            <div class="v" id="calcAgenzia">— €</div>
+          </div>
+          <div class="field" style="margin-top:14px">
+            <label>Notaio (€)</label>
+            <input type="text" id="notaio" placeholder="3.000" inputmode="numeric">
           </div>
           <div class="field">
-            <label>Aliquota agenzia (%)</label>
-            <input type="number" id="aliquotaAgenzia" value="4.88" step="0.01" inputmode="decimal">
-          </div>
-        </div>
-        <div class="calc-row">
-          <div class="l">Imposte <span style="color:var(--sub)">(aliquota × acquisto + 100)</span></div>
-          <div class="v" id="calcImposte">— €</div>
-        </div>
-        <div class="calc-row">
-          <div class="l">Agenzia <span style="color:var(--sub)">(aliquota × acquisto)</span></div>
-          <div class="v" id="calcAgenzia">— €</div>
-        </div>
-        <div class="field" style="margin-top:14px">
-          <label>Notaio (€)</label>
-          <input type="text" id="notaio" placeholder="3.000" inputmode="numeric">
-        </div>
-        <div class="field">
-          <label>Geometra (€)</label>
-          <input type="text" id="geometra" placeholder="2.000" inputmode="numeric">
-        </div>
-        <div class="field">
-          <label>Spese condominiali (€)</label>
-          <input type="text" id="speseCond" placeholder="3.000" inputmode="numeric">
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label>Arredo (€)</label>
-            <input type="text" id="arredo" placeholder="4.000" inputmode="numeric">
+            <label>Geometra (€)</label>
+            <input type="text" id="geometra" placeholder="2.000" inputmode="numeric">
           </div>
           <div class="field">
-            <label>Interior design (€)</label>
-            <input type="text" id="interior" placeholder="1.000" inputmode="numeric">
+            <label>Spese condominiali (€)</label>
+            <input type="text" id="speseCond" placeholder="3.000" inputmode="numeric">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Arredo (€)</label>
+              <input type="text" id="arredo" placeholder="4.000" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label>Interior design (€)</label>
+              <input type="text" id="interior" placeholder="1.000" inputmode="numeric">
+            </div>
+          </div>
+          <div class="field">
+            <label>Utenze / corrente (€)</label>
+            <input type="text" id="corrente" placeholder="400" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label>Ristrutturazione (€/mq)</label>
+            <input type="text" id="ristrutturazioneMq" placeholder="680" inputmode="numeric">
+          </div>
+          <div class="calc-row">
+            <div class="l">Ristrutturazione totale</div>
+            <div class="v" id="calcRistrutturazione">— €</div>
           </div>
         </div>
-        <div class="field">
-          <label>Utenze / corrente (€)</label>
-          <input type="text" id="corrente" placeholder="400" inputmode="numeric">
-        </div>
-        <div class="field">
-          <label>Ristrutturazione (€/mq)</label>
-          <input type="text" id="ristrutturazioneMq" placeholder="680" inputmode="numeric">
-        </div>
-        <div class="calc-row">
-          <div class="l">Ristrutturazione totale</div>
-          <div class="v" id="calcRistrutturazione">— €</div>
-        </div>
-      </div>
 
-      <div class="section-title">Ricavo</div>
-      <div class="card">
-        <div class="field key">
-          <label>Prezzo di vendita stimato (€/mq)</label>
-          <input type="text" id="prezzoMq" placeholder="6.700" inputmode="numeric">
+        <div class="section-title">Ricavo</div>
+        <div class="card">
+          <div class="field key">
+            <label>Prezzo di vendita stimato (€/mq)</label>
+            <input type="text" id="prezzoMq" placeholder="6.700" inputmode="numeric">
+          </div>
         </div>
-      </div>
 
-      <div class="section-title">Risultato</div>
-      <div class="result-card">
-        <div class="result-grid">
-          <div class="result-item"><div class="l">Totale costi</div><div class="v" id="rTotale">—</div></div>
-          <div class="result-item"><div class="l">Ricavo</div><div class="v" id="rRicavo">—</div></div>
-          <div class="result-item hl"><div class="l">Utile</div><div class="v" id="rUtile">—</div></div>
-          <div class="result-item"><div class="l">Capitale al rogito</div><div class="v" id="rRogito">—</div></div>
-          <div class="result-item"><div class="l">Acquisto €/mq</div><div class="v" id="rAcquistoMq">—</div></div>
-          <div class="result-item roi"><div class="l">ROI</div><div class="v" id="rRoi">—</div></div>
+        <div class="section-title">Risultato</div>
+        <div class="result-card">
+          <div class="result-grid">
+            <div class="result-item"><div class="l">Totale costi</div><div class="v" id="rTotale">—</div></div>
+            <div class="result-item"><div class="l">Ricavo</div><div class="v" id="rRicavo">—</div></div>
+            <div class="result-item hl"><div class="l">Utile</div><div class="v" id="rUtile">—</div></div>
+            <div class="result-item"><div class="l">Capitale al rogito</div><div class="v" id="rRogito">—</div></div>
+            <div class="result-item"><div class="l">Acquisto €/mq</div><div class="v" id="rAcquistoMq">—</div></div>
+            <div class="result-item roi"><div class="l">ROI</div><div class="v" id="rRoi">—</div></div>
+          </div>
         </div>
       </div>
 
@@ -199,6 +204,6 @@
 </div>
 
 <script src="omi-data.js?v=18"></script>
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

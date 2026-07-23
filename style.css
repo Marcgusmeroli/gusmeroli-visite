@@ -76,22 +76,30 @@ main{max-width:820px;margin:0 auto;padding:22px 18px 80px;}
 }
 .section-title:first-child{margin-top:0;}
 
-.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:30px 0 12px;}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;margin:30px 0 12px;}
 .section-head:first-child{margin-top:0;}
 .section-head .section-title{margin:0;}
-.checklist-toggle{
-  display:flex;align-items:center;gap:7px;flex-shrink:0;
+
+.panel-tabs{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;}
+.panel-tab{
+  display:flex;align-items:center;gap:7px;
   border:1.5px solid var(--border);background:var(--white);
   padding:7px 12px 7px 14px;border-radius:980px;
   font-size:11px;font-weight:700;letter-spacing:.2px;color:var(--slate);cursor:pointer;
 }
-.checklist-toggle .badge{
+.panel-tab .badge{
   background:var(--fog);color:var(--mid);font-family:'Inter',sans-serif;
   font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:980px;
 }
-.checklist-toggle.has-issue{border-color:var(--warn);}
-.checklist-toggle.has-issue .badge{background:var(--warn);color:#fff;}
-.checklist-toggle.all-ok .badge{background:var(--good);color:#fff;}
+.panel-tab.active{border-color:var(--dark);}
+.panel-tab.active .badge{background:var(--dark);color:#fff;}
+.panel-tab.has-issue{border-color:var(--warn);}
+.panel-tab.has-issue .badge{background:var(--warn);color:#fff;}
+.panel-tab.all-ok .badge{background:var(--good);color:#fff;}
+.panel-tab[data-panel="trattativa"].stato-vinta .badge{background:var(--good);color:#fff;}
+.panel-tab[data-panel="trattativa"].stato-persa .badge{background:var(--warn);color:#fff;}
+.panel-tab[data-panel="conto"].roi-neg .badge{background:var(--warn);color:#fff;}
+.panel-tab[data-panel="conto"].roi-pos .badge{background:var(--good);color:#fff;}
 
 .card{
   background:var(--white);border:1px solid var(--border);border-radius:18px;
