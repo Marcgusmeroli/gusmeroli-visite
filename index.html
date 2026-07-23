@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 <title>Gusmeroli — Strumento Visite</title>
-<link rel="stylesheet" href="style.css?v=20b">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -40,34 +40,15 @@
       <div class="section-head">
         <div class="section-title">Immobile</div>
         <div class="panel-tabs" id="panelTabs">
-          <button type="button" class="panel-tab" data-panel="checklist">Checklist<span class="badge" id="checklistBadge">0/14</span></button>
+          <button type="button" class="panel-tab" data-panel="checklist">Checklist</button>
           <button type="button" class="panel-tab" data-panel="trattativa">Trattativa<span class="badge" id="trattativaBadge">Da valutare</span></button>
           <button type="button" class="panel-tab active" data-panel="conto">Conto economico<span class="badge" id="contoBadge">—</span></button>
         </div>
       </div>
-      <div class="card">
-        <div class="field">
-          <label>Indirizzo (via e civico)</label>
-          <input type="text" id="indirizzo" placeholder="Es. Via Napo Torriani 18" autocomplete="off">
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label>Città</label>
-            <input type="text" id="citta" value="Milano" autocomplete="off">
-          </div>
-          <div class="field key">
-            <label>Superficie (mq)</label>
-            <input type="text" id="mq" placeholder="105" inputmode="numeric">
-          </div>
-        </div>
-        <div class="field">
-          <label>Progetto</label>
-          <input type="text" id="descrizione" placeholder="Es. Frazionamento in 2 bilocali">
-        </div>
-      </div>
 
       <div class="card checklist-card" id="checklistCard" style="display:none">
-        <div class="checklist-hint">Tocca ogni voce per segnare lo stato durante il sopralluogo: OK · Da verificare · Problema.</div>
+        <div class="immobile-ref empty" id="immobileRefCheck"></div>
+        <div class="checklist-hint">Tocca ogni voce per segnare lo stato durante il sopralluogo: OK · Accettabile · Da rifare.</div>
         <div id="checklistGroups"></div>
         <div class="field" style="margin-top:16px">
           <label>Note sopralluogo</label>
@@ -77,6 +58,7 @@
 
       <div id="trattativaCard" style="display:none">
         <div class="card">
+          <div class="immobile-ref empty" id="immobileRefTratt"></div>
           <div class="field">
             <label>Stato</label>
             <div class="status-pills" id="statoPills"></div>
@@ -98,6 +80,27 @@
       </div>
 
       <div id="contoEconomicoCard">
+        <div class="card">
+          <div class="field">
+            <label>Indirizzo (via e civico)</label>
+            <input type="text" id="indirizzo" placeholder="Es. Via Napo Torriani 18" autocomplete="off">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>Città</label>
+              <input type="text" id="citta" value="Milano" autocomplete="off">
+            </div>
+            <div class="field key">
+              <label>Superficie (mq)</label>
+              <input type="text" id="mq" placeholder="105" inputmode="numeric">
+            </div>
+          </div>
+          <div class="field">
+            <label>Progetto</label>
+            <input type="text" id="descrizione" placeholder="Es. Frazionamento in 2 bilocali">
+          </div>
+        </div>
+
         <div class="section-title">Zona &amp; quotazioni</div>
         <div class="card">
           <div id="zoneBox" class="zone-box empty">Inserisci via e città per cercare la zona OMI</div>
@@ -204,6 +207,6 @@
 </div>
 
 <script src="omi-data.js?v=18"></script>
-<script src="app.js?v=20b"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

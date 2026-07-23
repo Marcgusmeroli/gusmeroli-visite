@@ -94,12 +94,18 @@ main{max-width:820px;margin:0 auto;padding:22px 18px 80px;}
 .panel-tab.active{border-color:var(--dark);}
 .panel-tab.active .badge{background:var(--dark);color:#fff;}
 .panel-tab.has-issue{border-color:var(--warn);}
-.panel-tab.has-issue .badge{background:var(--warn);color:#fff;}
-.panel-tab.all-ok .badge{background:var(--good);color:#fff;}
-.panel-tab[data-panel="trattativa"].stato-vinta .badge{background:var(--good);color:#fff;}
-.panel-tab[data-panel="trattativa"].stato-persa .badge{background:var(--warn);color:#fff;}
+.panel-tab[data-panel="trattativa"].stato-offerta .badge{background:var(--amber);color:#fff;}
+.panel-tab[data-panel="trattativa"].stato-trattativa .badge{background:var(--good);color:#fff;}
 .panel-tab[data-panel="conto"].roi-neg .badge{background:var(--warn);color:#fff;}
 .panel-tab[data-panel="conto"].roi-pos .badge{background:var(--good);color:#fff;}
+
+.immobile-ref{
+  font-family:'Playfair Display',serif;font-size:19px;color:var(--text);letter-spacing:-.2px;
+  margin-bottom:16px;padding-bottom:13px;border-bottom:1px solid var(--border);
+}
+.immobile-ref.empty{
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:400;color:var(--sub);
+}
 
 .card{
   background:var(--white);border:1px solid var(--border);border-radius:18px;
@@ -210,13 +216,24 @@ main{max-width:820px;margin:0 auto;padding:22px 18px 80px;}
 .check-item:last-child{border-bottom:none;}
 .check-item span{font-size:14px;color:var(--text);}
 .check-status{
-  flex-shrink:0;min-width:108px;text-align:center;
+  flex-shrink:0;min-width:112px;text-align:center;
   border:1.5px solid var(--border);background:var(--fog);color:var(--sub);
   padding:7px 10px;border-radius:980px;font-size:11.5px;font-weight:700;cursor:pointer;
 }
-.check-status[data-state="ok"]{background:var(--good);border-color:var(--good);color:#fff;}
-.check-status[data-state="attenzione"]{background:var(--amber);border-color:var(--amber);color:#fff;}
-.check-status[data-state="problema"]{background:var(--warn);border-color:var(--warn);color:#fff;}
+.check-status[data-tone="good"]{background:var(--good);border-color:var(--good);color:#fff;}
+.check-status[data-tone="amber"]{background:var(--amber);border-color:var(--amber);color:#fff;}
+.check-status[data-tone="warn"]{background:var(--warn);border-color:var(--warn);color:#fff;}
+.check-status[data-tone="neutral"]{background:var(--dark);border-color:var(--dark);color:#fff;}
+
+/* voce "Piano e ascensore": input piano + toggle ascensore */
+.check-item.piano-item{flex-wrap:wrap;}
+.piano-controls{display:flex;gap:8px;align-items:center;flex-shrink:0;}
+.piano-input{
+  width:96px;padding:7px 10px;border:1.5px solid var(--border);border-radius:10px;
+  font-size:14px;color:var(--text);background:var(--page);outline:none;
+}
+.piano-input:focus{border-color:var(--sand);}
+.check-status.piano-asc{min-width:130px;}
 
 /* ── TRATTATIVA ── */
 .status-pills{display:flex;flex-wrap:wrap;gap:8px;}

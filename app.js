@@ -240,7 +240,22 @@ function aggiornaZona(){
     <a href="https://www1.agenziaentrate.gov.it/servizi/Consultazione/ricerca.php" target="_blank" rel="noopener">Agenzia Entrate OMI</a>
     <a href="https://www.immobiliare.it/vendita-case/milano/" target="_blank" rel="noopener">Immobiliare.it</a>
   `;
+  updateImmobileRef();
 }
+
+// Intestazione "Città via civico" mostrata in cima a Checklist e Trattativa.
+function updateImmobileRef(){
+  const ind = document.getElementById("indirizzo").value.trim();
+  const cit = document.getElementById("citta").value.trim();
+  const txt = [cit, ind].filter(Boolean).join(" ");
+  ["immobileRefCheck","immobileRefTratt"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (txt){ el.textContent = txt; el.classList.remove("empty"); }
+    else { el.textContent = "Nessun indirizzo — inseriscilo nel Conto economico"; el.classList.add("empty"); }
+  });
+}
+
 document.getElementById("indirizzo").addEventListener("input", aggiornaZona);
 document.getElementById("citta").addEventListener("input", aggiornaZona);
 document.getElementById("prezzoMq").addEventListener("input", e => e.target.dataset.userEdited = "1");
@@ -248,25 +263,39 @@ aggiornaZona();
 
 
 // ===== CHECKLIST SOPRALLUOGO =====
+// Ogni set di opzioni: [valore, etichetta, tono]. Tono => colore: good/amber/warn/neutral.
+const OPTSETS = {
+  cond:     [["ok","OK","good"], ["acc","Accettabile","amber"], ["rifare","Da rifare","warn"]],
+  doc:      [["ok","OK","good"], ["verifica","Da verificare","amber"], ["problema","Problema","warn"]],
+  presenza: [["presente","Presente","warn"], ["assente","Non presente","good"]],
+  livello:  [["basso","Basso","good"], ["medio","Medio","amber"], ["alto","Alto","warn"]],
+  sino_pos: [["si","Sì","good"], ["no","No","neutral"]],
+  sino_neg: [["si","Sì","warn"], ["no","No","good"]],
+};
 const CHECKLIST_ITEMS = [
-  { key:"elettrico",   label:"Impianto elettrico",              group:"Impianti" },
-  { key:"idraulico",   label:"Impianto idraulico",               group:"Impianti" },
-  { key:"riscaldamento",label:"Riscaldamento / climatizzazione", group:"Impianti" },
-  { key:"umidita",     label:"Umidità / muffa",                  group:"Stato immobile" },
-  { key:"infissi",     label:"Infissi",                          group:"Stato immobile" },
-  { key:"facciata",    label:"Facciata / tetto",                 group:"Stato immobile" },
-  { key:"rumore",      label:"Rumore / esposizione",             group:"Stato immobile" },
-  { key:"catasto",     label:"Conformità catastale / planimetria",group:"Documenti" },
-  { key:"ape",         label:"Classe energetica (APE)",          group:"Documenti" },
-  { key:"vincoli",     label:"Vincoli (paesaggistico/storico)",  group:"Documenti" },
-  { key:"abusi",       label:"Abusi edilizi visibili",           group:"Documenti" },
-  { key:"piano",       label:"Piano e ascensore",                group:"Contesto" },
-  { key:"spesearretrate",label:"Spese condominiali arretrate",   group:"Contesto" },
-  { key:"parcheggio",  label:"Parcheggio / box",                 group:"Contesto" },
+  { key:"elettrico",    label:"Impianto elettrico",                group:"Impianti",       opts:"cond" },
+  { key:"idraulico",    label:"Impianto idraulico",                group:"Impianti",       opts:"cond" },
+  { key:"riscaldamento",label:"Riscaldamento / climatizzazione",   group:"Impianti",       opts:"cond" },
+  { key:"umidita",      label:"Umidità / muffa",                   group:"Stato immobile", opts:"presenza" },
+  { key:"infissi",      label:"Infissi",                           group:"Stato immobile", opts:"cond" },
+  { key:"facciata",     label:"Facciata / tetto",                  group:"Stato immobile", opts:"cond" },
+  { key:"rumore",       label:"Rumore / esposizione",              group:"Stato immobile", opts:"livello" },
+  { key:"catasto",      label:"Conformità catastale / planimetria",group:"Documenti",      opts:"doc" },
+  { key:"ape",          label:"Classe energetica (APE)",           group:"Documenti",      opts:"doc" },
+  { key:"vincoli",      label:"Vincoli (paesaggistico/storico)",   group:"Documenti",      opts:"doc" },
+  { key:"abusi",        label:"Abusi edilizi visibili",            group:"Documenti",      opts:"doc" },
+  { key:"piano",        label:"Piano e ascensore",                 group:"Contesto",       type:"piano", opts:"sino_pos" },
+  { key:"spesearretrate",label:"Spese condominiali arretrate",     group:"Contesto",       opts:"sino_neg" },
+  { key:"parcheggio",   label:"Parcheggio / box",                  group:"Contesto",       opts:"sino_pos" },
 ];
-const CHECK_STATES = ["", "ok", "attenzione", "problema"];
-const CHECK_LABELS = { "":"Da valutare", ok:"OK", attenzione:"Da verificare", problema:"Problema" };
-let checklistState = {};
+let checklistState = {};   // key -> valore selezionato (stringa)
+let pianoText = "";        // testo libero del piano
+
+function optInfo(item, val){
+  return (OPTSETS[item.opts] || []).find(o => o[0] === val) || null;
+}
+function optLabel(item, val){ const o = optInfo(item, val); return o ? o[1] : "Da valutare"; }
+function optTone(item, val){ const o = optInfo(item, val); return o ? o[2] : ""; }
 
 function buildChecklist(){
   const wrap = document.getElementById("checklistGroups");
@@ -274,53 +303,67 @@ function buildChecklist(){
   wrap.innerHTML = groups.map(g => `
     <div class="check-group">
       <div class="check-group-lbl">${g}</div>
-      ${CHECKLIST_ITEMS.filter(i => i.group === g).map(i => `
+      ${CHECKLIST_ITEMS.filter(i => i.group === g).map(i => {
+        const val = checklistState[i.key] || "";
+        if (i.type === "piano"){
+          return `
+        <div class="check-item piano-item">
+          <span>${i.label}</span>
+          <div class="piano-controls">
+            <input type="text" class="piano-input" id="pianoInput" placeholder="Piano (es. 2°)" value="${pianoText.replace(/"/g,'&quot;')}">
+            <button type="button" class="check-status piano-asc" data-key="${i.key}" data-tone="${optTone(i,val)}">${val ? "Ascensore: " + optLabel(i,val) : "Ascensore?"}</button>
+          </div>
+        </div>`;
+        }
+        return `
         <div class="check-item">
           <span>${i.label}</span>
-          <button type="button" class="check-status" data-key="${i.key}" data-state="">Da valutare</button>
-        </div>
-      `).join("")}
+          <button type="button" class="check-status" data-key="${i.key}" data-tone="${optTone(i,val)}">${val ? optLabel(i,val) : "Da valutare"}</button>
+        </div>`;
+      }).join("")}
     </div>
   `).join("");
+
   wrap.querySelectorAll(".check-status").forEach(btn => {
     btn.addEventListener("click", () => {
       const key = btn.dataset.key;
-      const cur = CHECK_STATES.indexOf(checklistState[key] || "");
-      const next = CHECK_STATES[(cur + 1) % CHECK_STATES.length];
+      const item = CHECKLIST_ITEMS.find(i => i.key === key);
+      const seq = ["", ...OPTSETS[item.opts].map(o => o[0])];
+      const cur = seq.indexOf(checklistState[key] || "");
+      const next = seq[(cur + 1) % seq.length];
       checklistState[key] = next;
-      btn.dataset.state = next;
-      btn.textContent = CHECK_LABELS[next];
+      btn.dataset.tone = optTone(item, next);
+      btn.textContent = item.type === "piano"
+        ? (next ? "Ascensore: " + optLabel(item, next) : "Ascensore?")
+        : (next ? optLabel(item, next) : "Da valutare");
       updateChecklistBadge();
     });
   });
+  const pi = document.getElementById("pianoInput");
+  if (pi) pi.addEventListener("input", e => pianoText = e.target.value);
+}
+
+function countIssues(state){
+  return CHECKLIST_ITEMS.filter(i => optTone(i, (state || {})[i.key]) === "warn").length;
 }
 
 function updateChecklistBadge(){
-  const total = CHECKLIST_ITEMS.length;
-  const compiled = CHECKLIST_ITEMS.filter(i => checklistState[i.key]).length;
-  const problemi = CHECKLIST_ITEMS.filter(i => checklistState[i.key] === "problema").length;
-  const badge = document.getElementById("checklistBadge");
   const tab = document.querySelector('.panel-tab[data-panel="checklist"]');
-  badge.textContent = `${compiled}/${total}`;
-  tab.classList.toggle("has-issue", problemi > 0);
-  tab.classList.toggle("all-ok", problemi === 0 && compiled === total);
+  tab.classList.toggle("has-issue", countIssues(checklistState) > 0);
 }
 
 function resetChecklistUI(){
   checklistState = {};
+  pianoText = "";
   buildChecklist();
   updateChecklistBadge();
   document.getElementById("checklistNote").value = "";
 }
 
-function applyChecklistState(saved){
+function applyChecklistState(saved, pianoSaved){
   checklistState = Object.assign({}, saved || {});
+  pianoText = pianoSaved || "";
   buildChecklist();
-  document.querySelectorAll(".check-status").forEach(btn => {
-    const st = checklistState[btn.dataset.key] || "";
-    btn.dataset.state = st;
-    btn.textContent = CHECK_LABELS[st];
-  });
   updateChecklistBadge();
 }
 
@@ -367,8 +410,8 @@ function updateTrattativaBadge(){
   const badge = document.getElementById("trattativaBadge");
   const tab = document.querySelector('.panel-tab[data-panel="trattativa"]');
   badge.textContent = info.label;
-  tab.classList.toggle("stato-vinta", trattativaStato === "vinta");
-  tab.classList.toggle("stato-persa", trattativaStato === "persa");
+  tab.classList.toggle("stato-offerta", trattativaStato === "offerta");
+  tab.classList.toggle("stato-trattativa", trattativaStato === "trattativa");
 }
 
 function buildStatoPills(){
@@ -468,6 +511,7 @@ function raccogliScheda(){
     citta: document.getElementById("citta").value,
     descrizione: document.getElementById("descrizione").value,
     checklist: Object.assign({}, checklistState),
+    pianoText: pianoText,
     checklistNote: document.getElementById("checklistNote").value,
     trattativaStato: trattativaStato,
     trattativaNote: document.getElementById("trattativaNote").value,
@@ -514,7 +558,7 @@ document.getElementById("btnShare").addEventListener("click", async () => {
   const citta = document.getElementById("citta").value;
   const descrizione = document.getElementById("descrizione").value;
   const statoLbl = (STATO_OPTIONS.find(s => s.key === trattativaStato) || {}).label || "";
-  const problemi = CHECKLIST_ITEMS.filter(i => checklistState[i.key] === "problema").map(i => i.label);
+  const problemi = CHECKLIST_ITEMS.filter(i => optTone(i, checklistState[i.key]) === "warn").map(i => i.label);
   const testo = `${indirizzo}${citta ? ", " + citta : ""}\n${descrizione || ""}\n\n` +
     `Superficie: ${c.mq} mq\n` +
     `Acquisto: ${fmtEuro(c.acquisto)} (${isFinite(c.acquistoMq) ? c.acquistoMq.toLocaleString("it-IT",{maximumFractionDigits:0}) : "—"} €/mq)\n` +
@@ -546,7 +590,7 @@ function renderSaved(){
     const dt = new Date(v.data);
     const dataStr = dt.toLocaleDateString("it-IT",{day:"2-digit",month:"short",year:"numeric"});
     const statoInfo = STATO_OPTIONS.find(s => s.key === v.trattativaStato);
-    const problemi = CHECKLIST_ITEMS.filter(i => (v.checklist || {})[i.key] === "problema").length;
+    const problemi = countIssues(v.checklist);
     return `
       <div class="visit-item" data-id="${v.id}">
         <div class="vi-top">
@@ -596,7 +640,7 @@ function renderSaved(){
       formatAllGrouped();
       calcola();
       aggiornaZona();
-      applyChecklistState(v.checklist);
+      applyChecklistState(v.checklist, v.pianoText);
       document.getElementById("checklistNote").value = v.checklistNote || "";
       trattativaStato = v.trattativaStato || "valutazione";
       buildStatoPills();
