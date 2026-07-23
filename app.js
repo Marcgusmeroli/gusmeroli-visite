@@ -265,7 +265,7 @@ aggiornaZona();
 // ===== CHECKLIST SOPRALLUOGO =====
 // Ogni set di opzioni: [valore, etichetta, tono]. Tono => colore: good/amber/warn/neutral.
 const OPTSETS = {
-  cond:     [["ok","OK","good"], ["acc","Accettabile","amber"], ["rifare","Da rifare","warn"]],
+  cond:     [["rifare","Da rifare","warn"], ["acc","Accettabile","amber"], ["ok","OK","good"]],
   doc:      [["ok","OK","good"], ["verifica","Da verificare","amber"], ["problema","Problema","warn"]],
   presenza: [["presente","Presente","warn"], ["assente","Non presente","good"]],
   livello:  [["basso","Basso","good"], ["medio","Medio","amber"], ["alto","Alto","warn"]],
@@ -313,7 +313,7 @@ function buildChecklist(){
           <span>${i.label}</span>
           <div class="piano-controls">
             <button type="button" class="check-status piano-asc" data-key="${i.key}" data-tone="${optTone(i,val)}">${val ? "Ascensore: " + optLabel(i,val) : "Ascensore?"}</button>
-            <input type="text" class="piano-input" id="pianoInput" placeholder="Piano (es. 2°)" value="${pianoText.replace(/"/g,'&quot;')}">
+            <input type="text" class="piano-input" id="pianoInput" placeholder="Piano es. 2°" value="${pianoText.replace(/"/g,'&quot;')}">
           </div>
         </div>`;
         }
@@ -409,6 +409,10 @@ function showPanel(name){
 document.querySelectorAll(".panel-tab").forEach(btn => {
   btn.addEventListener("click", () => showPanel(btn.dataset.panel));
 });
+
+// Click sul logo Gusmeroli -> torna alla pagina principale (Conto economico)
+const topLogo = document.getElementById("topLogo");
+if (topLogo) topLogo.addEventListener("click", () => { setTab("new"); showPanel("conto"); });
 
 
 // ===== TRATTATIVA =====
