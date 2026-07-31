@@ -277,6 +277,30 @@ function cercaComune(citta, prov){
   return null;
 }
 
+// Elenco nomi comune (ordinati) di una provincia dal dataset.
+function comuniDiProvincia(prov){
+  const P = OMI_DATA.province;
+  const list = [];
+  if (P && P.comuni){
+    for (const k in P.comuni) if (P.comuni[k].prov === prov) list.push(P.comuni[k].nome);
+  }
+  return list.sort((a, b) => a.localeCompare(b, "it"));
+}
+
+// Riempie il menu a tendina Comune per la provincia scelta (Milano città in testa per MI).
+function popolaComuni(prov, selected){
+  const sel = document.getElementById("citta");
+  if (!sel) return;
+  let opts = "";
+  if (prov === "MI") opts += `<option value="Milano">Milano (città)</option>`;
+  comuniDiProvincia(prov).forEach(n => {
+    opts += `<option value="${n.replace(/"/g, "&quot;")}">${n}</option>`;
+  });
+  sel.innerHTML = opts || `<option value="">— dati comune non disponibili —</option>`;
+  if (selected != null) sel.value = selected;
+  if (!sel.value && sel.options.length) sel.selectedIndex = 0;
+}
+
 // Parole da ignorare nel confronto via <-> denominazione zona OMI.
 const STOP_TOK = new Set(["via","viale","vicolo","corso","piazza","piazzale","largo","localita","loc",
   "frazione","fraz","strada","contrada","salita","passaggio","ripa","foro","alzaia","galleria","nucleo",
@@ -336,6 +360,8 @@ function renderProvincia(box, com, indirizzo){
   }
   const idx = Math.min(selZonaProv.idx, com.zone.length - 1);
   const zi = com.zone[idx];
+  // Aggiorna il prezzo/mq solo quando la zona è certa: auto-match, scelta a mano, o zona unica.
+  const zonaCerta = selZonaProv.manual || selZonaProv.auto || com.zone.length === 1;
   const forcePrezzo = selZonaProv.manual || selZonaProv.auto;
 
   box.innerHTML = `
@@ -361,7 +387,7 @@ function renderProvincia(box, com, indirizzo){
       selZonaProv = { key: com.key, via: indirizzo, idx: +b.dataset.i, manual: true, auto: false };
       renderProvincia(box, com, indirizzo);
     }));
-  setPrezzoFromZona(zi, forcePrezzo);
+  if (zonaCerta) setPrezzoFromZona(zi, forcePrezzo);
 }
 
 // Render della zona di Milano città (ricerca per via).
@@ -445,16 +471,15 @@ function updateImmobileRef(){
 }
 
 document.getElementById("indirizzo").addEventListener("input", aggiornaZona);
-document.getElementById("citta").addEventListener("input", aggiornaZona);
+document.getElementById("citta").addEventListener("change", () => { selZonaProv = null; aggiornaZona(); });
 document.getElementById("prezzoMq").addEventListener("input", e => e.target.dataset.userEdited = "1");
 const provinciaEl = document.getElementById("provincia");
 if (provinciaEl) provinciaEl.addEventListener("change", () => {
   selZonaProv = null;
-  const cittaEl = document.getElementById("citta");
-  if (provinciaEl.value === "MI") cittaEl.value = "Milano";
-  else if (normComune(cittaEl.value) === "milano") cittaEl.value = "";
+  popolaComuni(provinciaEl.value);   // ripopola i comuni della provincia scelta
   aggiornaZona();
 });
+popolaComuni(provinciaSel(), "Milano");
 aggiornaZona();
 
 
@@ -722,6 +747,7 @@ function raccogliScheda(){
     id: Date.now(),
     data: new Date().toISOString(),
     indirizzo: document.getElementById("indirizzo").value,
+    provincia: provinciaSel(),
     citta: document.getElementById("citta").value,
     descrizione: document.getElementById("descrizione").value,
     checklist: Object.assign({}, checklistState),
@@ -750,8 +776,8 @@ document.getElementById("btnReset").addEventListener("click", () => {
   if (!confirm("Svuotare tutti i campi della scheda corrente?")) return;
   ["indirizzo","descrizione","mq","prezzoMq","acquisto","notaio","geometra","speseCond","arredo","interior","corrente","ristrutturazioneMq"]
     .forEach(id => document.getElementById(id).value = "");
-  document.getElementById("citta").value = "Milano";
   if (document.getElementById("provincia")) document.getElementById("provincia").value = "MI";
+  popolaComuni("MI", "Milano");
   selZonaProv = null;
   document.getElementById("ristrutturazioneMq").value = "680";
   document.getElementById("roiTarget").value = 30;
@@ -841,7 +867,9 @@ function renderSaved(){
         return;
       }
       document.getElementById("indirizzo").value = v.indirizzo || "";
-      document.getElementById("citta").value = v.citta || "Milano";
+      const provV = v.provincia || "MI";
+      if (document.getElementById("provincia")) document.getElementById("provincia").value = provV;
+      popolaComuni(provV, v.citta || "Milano");
       document.getElementById("descrizione").value = v.descrizione || "";
       document.getElementById("mq").value = v.mq || "";
       document.getElementById("prezzoMq").value = v.prezzoMq || "";
