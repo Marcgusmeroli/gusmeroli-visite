@@ -16,6 +16,7 @@ async function tryUnlock(){
     localStorage.setItem(UNLOCK_KEY, "1");
     document.getElementById("lock").classList.add("hidden");
     document.getElementById("app").classList.add("visible");
+    applyImportFromUrl();
   } else {
     document.getElementById("lockErr").textContent = "Password errata";
     document.getElementById("lockInput").value = "";
@@ -100,6 +101,18 @@ function calcola(){
   const capitaleRogito = hasAcq ? acquisto + notaio + agenzia : NaN;
   const acquistoMq = (hasAcq && hasMq && mq > 0) ? acquisto / mq : NaN;
 
+  // Prezzo massimo d'acquisto per centrare il ROI obiettivo.
+  // ROI = ricavo/totale − 1  →  totale obiettivo = ricavo / (1 + ROI).
+  // I costi si dividono in: quota proporzionale all'acquisto (k) e quota fissa (costiFissi).
+  //   totale = k·acquisto + costiFissi  →  acquisto = (totaleObiettivo − costiFissi) / k
+  const roiTarget = num("roiTarget");
+  const hasRoiT = filled("roiTarget") && roiTarget > -100;
+  const kMul = 1 + aliquotaImposte/100 + aliquotaAgenzia/100;
+  const costiFissi = 100 + notaio + geometra + speseCond + arredo + interior + corrente + (hasRistr ? ristrutturazione : 0);
+  const totaleObiettivo = (hasMq && hasPrezzo && hasRoiT) ? ricavo / (1 + roiTarget/100) : NaN;
+  const offerta = isFinite(totaleObiettivo) ? (totaleObiettivo - costiFissi) / kMul : NaN;
+  const offertaMq = (isFinite(offerta) && hasMq && mq > 0) ? offerta / mq : NaN;
+
   document.getElementById("calcImposte").textContent = fmtEuro(imposte);
   document.getElementById("calcAgenzia").textContent = fmtEuro(agenzia);
   document.getElementById("calcRistrutturazione").textContent = fmtEuro(ristrutturazione);
@@ -111,6 +124,11 @@ function calcola(){
   document.getElementById("rAcquistoMq").textContent = isFinite(acquistoMq) ? groupInt(acquistoMq) + " €/mq" : "—";
   document.getElementById("rRoi").textContent = fmtPct(roi);
 
+  const offEl = document.getElementById("rOfferta");
+  offEl.textContent = fmtEuro(offerta);
+  offEl.classList.toggle("neg", isFinite(offerta) && offerta <= 0);
+  document.getElementById("rOffertaMq").textContent = isFinite(offertaMq) ? groupInt(offertaMq) + " €/mq d'offerta" : "—";
+
   const utileEl = document.getElementById("rUtile").closest(".result-item");
   utileEl.classList.toggle("neg", utile < 0);
   const roiEl = document.getElementById("rRoi").closest(".result-item");
@@ -118,11 +136,25 @@ function calcola(){
   updateContoBadge(roi);
 
   return { mq, prezzoMq, acquisto, notaio, geometra, speseCond, arredo, interior, corrente,
-    ristrutturazioneMq, aliquotaImposte, aliquotaAgenzia, imposte, agenzia, ristrutturazione, totale, ricavo, utile, roi, capitaleRogito, acquistoMq };
+    ristrutturazioneMq, aliquotaImposte, aliquotaAgenzia, roiTarget, imposte, agenzia, ristrutturazione,
+    totale, ricavo, utile, roi, capitaleRogito, acquistoMq, offerta, offertaMq };
 }
 
 GROUPED.forEach(id => document.getElementById(id).addEventListener("input", e => { formatGrouped(e.target); calcola(); }));
-["aliquotaImposte","aliquotaAgenzia"].forEach(id => document.getElementById(id).addEventListener("input", calcola));
+["aliquotaImposte","aliquotaAgenzia","roiTarget"].forEach(id => document.getElementById(id).addEventListener("input", calcola));
+
+// "Usa come prezzo di acquisto": copia il prezzo max d'offerta nel campo acquisto.
+document.getElementById("btnUsaOfferta").addEventListener("click", () => {
+  const c = calcola();
+  if (!isFinite(c.offerta) || c.offerta <= 0){
+    alert("Per il prezzo d'offerta servono la superficie (mq) e il prezzo di vendita stimato (€/mq).");
+    return;
+  }
+  const el = document.getElementById("acquisto");
+  el.value = groupInt(Math.round(c.offerta));
+  formatGrouped(el);
+  calcola();
+});
 
 formatAllGrouped();
 calcola();
@@ -193,52 +225,208 @@ function cercaZona(indirizzo, citta){
   return Object.assign({ codice: code }, zi);
 }
 
+// Formatta un intervallo €/mq (min–max, oppure "da X", oppure n/d).
+function fmtRange(a, b){
+  if (a && b) return a === b ? `${groupInt(a)} €/mq` : `${groupInt(a)}–${groupInt(b)} €/mq`;
+  if (a) return `da ${groupInt(a)} €/mq`;
+  if (b) return `fino a ${groupInt(b)} €/mq`;
+  return "n/d";
+}
+
+// Normalizza il nome di un comune allo stesso modo delle chiavi in OMI_DATA.province.comuni.
+function normComune(s){
+  return (s||"").toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/[^a-z0-9]+/g," ")
+    .replace(/\s+/g," ").trim();
+}
+
+// ===== PROVINCIA (comune -> zona OMI) =====
+let selZonaProv = null;   // { key, via, idx, manual, auto }
+
+function provNome(pr){ return ((OMI_DATA.province && OMI_DATA.province.prov_nomi) || {})[pr] || pr; }
+
+// Indice: provincia -> { nomeComuneNormalizzato -> chiave in OMI_DATA.province.comuni }
+let PROV_INDEX = null;
+function provIndex(){
+  if (PROV_INDEX) return PROV_INDEX;
+  PROV_INDEX = {};
+  const P = OMI_DATA.province;
+  if (P && P.comuni){
+    for (const key in P.comuni){
+      const c = P.comuni[key];
+      (PROV_INDEX[c.prov] = PROV_INDEX[c.prov] || {})[normComune(c.nome)] = key;
+    }
+  }
+  return PROV_INDEX;
+}
+
+// Trova il comune nella provincia scelta dal nome digitato (match esatto o prefisso univoco).
+function cercaComune(citta, prov){
+  const P = OMI_DATA.province;
+  if (!P || !P.comuni) return null;
+  const cn = normComune(citta);
+  if (!cn) return null;
+  const idx = provIndex()[prov];
+  if (!idx) return null;
+  if (idx[cn]) return Object.assign({ key: idx[cn] }, P.comuni[idx[cn]]);
+  if (cn.length >= 3){
+    const hits = Object.keys(idx).filter(n => n.startsWith(cn));
+    if (hits.length === 1) return Object.assign({ key: idx[hits[0]] }, P.comuni[idx[hits[0]]]);
+  }
+  return null;
+}
+
+// Parole da ignorare nel confronto via <-> denominazione zona OMI.
+const STOP_TOK = new Set(["via","viale","vicolo","corso","piazza","piazzale","largo","localita","loc",
+  "frazione","fraz","strada","contrada","salita","passaggio","ripa","foro","alzaia","galleria","nucleo",
+  "del","della","dei","degli","delle","dello","san","santa","sant","santo","ss"]);
+function toks(s){
+  return normComune(s).split(" ").filter(t => t.length >= 3 && !/^\d+$/.test(t) && !STOP_TOK.has(t));
+}
+// Indice della zona la cui denominazione OMI contiene la via digitata, o -1 se incerto/assente.
+function matchViaZona(indirizzo, zone){
+  const qt = toks(indirizzo);
+  if (!qt.length) return -1;
+  let best = -1, bestScore = 0, ties = 0;
+  zone.forEach((z, i) => {
+    const dt = toks(z.nome || "");
+    if (!dt.length) return;
+    let score = 0;
+    qt.forEach(q => { if (dt.some(d => d === q || d.startsWith(q) || q.startsWith(d))) score++; });
+    if (score > bestScore){ bestScore = score; best = i; ties = 1; }
+    else if (score === bestScore && score > 0){ ties++; }
+  });
+  return (bestScore > 0 && ties === 1) ? best : -1;
+}
+
+function setPrezzoFromZona(z, force){
+  const el = document.getElementById("prezzoMq");
+  if (!z) return;
+  if (!force && el.dataset.userEdited) return;
+  const base = z.ri_min ? [z.ri_min, z.ri_max || z.ri_min]
+             : z.dr_min ? [z.dr_min, z.dr_max || z.dr_min] : null;
+  if (!base) return;
+  el.value = groupInt(Math.round((base[0] + base[1]) / 2));
+  if (force) delete el.dataset.userEdited;
+  calcola();
+}
+
+// Etichetta breve per il chip zona: codice + nome (se corto) o fascia.
+function zonaLabel(z){
+  const nm = (z.nome || "").trim();
+  const corto = nm && nm.length <= 18 && nm.indexOf(",") < 0 && !nm.endsWith("...");
+  return z.codice + (corto ? " · " + nm : (z.fascia ? " · " + z.fascia : ""));
+}
+
+function renderProvincia(box, com, indirizzo){
+  box.classList.remove("empty");
+  const P = OMI_DATA.province;
+  if (!com.zone || !com.zone.length){
+    box.classList.add("empty");
+    box.textContent = `${com.nome} (${provNome(com.prov)}): OMI non riporta quotazioni residenziali per questo comune.`;
+    return;
+  }
+
+  // Selezione zona: manuale (chip toccato) se via invariata, altrimenti auto-match dalla via.
+  const manualeValida = selZonaProv && selZonaProv.key === com.key && selZonaProv.manual && selZonaProv.via === indirizzo;
+  if (!manualeValida){
+    const auto = matchViaZona(indirizzo, com.zone);
+    selZonaProv = { key: com.key, via: indirizzo, idx: auto >= 0 ? auto : 0, manual: false, auto: auto >= 0 };
+  }
+  const idx = Math.min(selZonaProv.idx, com.zone.length - 1);
+  const zi = com.zone[idx];
+  const forcePrezzo = selZonaProv.manual || selZonaProv.auto;
+
+  box.innerHTML = `
+    <div class="zone-name">${com.nome} <span class="zone-prov">${provNome(com.prov)}</span></div>
+    ${com.zone.length > 1 ? `<div class="zona-chips">${com.zone.map((z,i) =>
+      `<button type="button" class="zona-chip${i === idx ? " active" : ""}" data-i="${i}">${zonaLabel(z)}</button>`).join("")}</div>` : ""}
+    ${selZonaProv.auto ? `<div class="zone-hint ok">✓ Via riconosciuta nella zona ${zi.codice}</div>`
+      : (com.zone.length > 1 ? `<div class="zone-hint">Scegli la zona, o scrivi la via per riconoscerla</div>` : "")}
+    <div class="zone-scenarios">
+      <div class="scen da">
+        <div class="scen-lbl">Da ristrutturare</div>
+        <div class="scen-val">${fmtRange(zi.dr_min, zi.dr_max)}</div>
+      </div>
+      <div class="scen ri">
+        <div class="scen-lbl">Ristrutturato</div>
+        <div class="scen-val">${fmtRange(zi.ri_min, zi.ri_max)}</div>
+      </div>
+    </div>
+    <div class="zone-src">Zona ${zi.codice} · ${zi.fascia || ""} · ${P.fonte} ${P.periodo}${zi.eco ? " · valori su abitazioni di tipo economico (civili non quotate)" : ""}</div>
+  `;
+  box.querySelectorAll(".zona-chip[data-i]").forEach(b =>
+    b.addEventListener("click", () => {
+      selZonaProv = { key: com.key, via: indirizzo, idx: +b.dataset.i, manual: true, auto: false };
+      renderProvincia(box, com, indirizzo);
+    }));
+  setPrezzoFromZona(zi, forcePrezzo);
+}
+
+// Render della zona di Milano città (ricerca per via).
+function renderMilanoZona(box, zona){
+  box.classList.remove("empty");
+  box.innerHTML = `
+    <div class="zone-name">Zona ${zona.codice ? zona.codice + " — " : ""}${zona.nome}</div>
+    <div class="zone-scenarios">
+      <div class="scen da">
+        <div class="scen-lbl">Da ristrutturare</div>
+        <div class="scen-val">${fmtRange(zona.dr_min, zona.dr_max)}</div>
+      </div>
+      <div class="scen ri">
+        <div class="scen-lbl">Ristrutturato</div>
+        <div class="scen-val">${fmtRange(zona.ri_min, zona.ri_max)}</div>
+      </div>
+    </div>
+    ${zona.ntn ? `<div class="scen mkt">
+      <div class="scen-lbl">Compravendite 2025</div>
+      <div class="scen-val">${groupInt(zona.ntn)}${zona.ntn_var != null ? ` <span class="mkt-var">(${zona.ntn_var >= 0 ? "+" : ""}${zona.ntn_var}% sul 2024)</span>` : ""}</div>
+    </div>` : ""}
+    <div class="zone-src">${OMI_DATA.fonte} · quotazioni ${OMI_DATA.periodo}${zona.ntn ? " · transazioni " + OMI_DATA.ntn_periodo : ""}${zona.solo_ottimo ? " · OMI riporta solo lo stato Ottimo per questa zona" : ""}</div>
+  `;
+  setPrezzoFromZona({ ri_min: zona.ri_min, ri_max: zona.ri_max, dr_min: zona.dr_min, dr_max: zona.dr_max }, false);
+}
+
+function provinciaSel(){ const el = document.getElementById("provincia"); return el ? el.value : "MI"; }
+
 function aggiornaZona(){
   const indirizzo = document.getElementById("indirizzo").value;
   const citta = document.getElementById("citta").value;
+  const prov = provinciaSel();
   const box = document.getElementById("zoneBox");
   const linkRow = document.getElementById("linkRow");
+  const cn = normComune(citta);
 
-  const zona = cercaZona(indirizzo, citta);
-  if (zona){
-    box.classList.remove("empty");
-    const rng = (a,b) => {
-      if (a && b) return a === b ? `${groupInt(a)} €/mq` : `${groupInt(a)}–${groupInt(b)} €/mq`;
-      if (a) return `da ${groupInt(a)} €/mq`;
-      return "n/d";
-    };
-    box.innerHTML = `
-      <div class="zone-name">Zona ${zona.codice ? zona.codice + " — " : ""}${zona.nome}</div>
-      <div class="zone-scenarios">
-        <div class="scen da">
-          <div class="scen-lbl">Da ristrutturare</div>
-          <div class="scen-val">${rng(zona.dr_min, zona.dr_max)}</div>
-        </div>
-        <div class="scen ri">
-          <div class="scen-lbl">Ristrutturato</div>
-          <div class="scen-val">${rng(zona.ri_min, zona.ri_max)}</div>
-        </div>
-      </div>
-      ${zona.ntn ? `<div class="scen mkt">
-        <div class="scen-lbl">Compravendite 2025</div>
-        <div class="scen-val">${groupInt(zona.ntn)}${zona.ntn_var != null ? ` <span class="mkt-var">(${zona.ntn_var >= 0 ? "+" : ""}${zona.ntn_var}% sul 2024)</span>` : ""}</div>
-      </div>` : ""}
-      <div class="zone-src">${OMI_DATA.fonte} · quotazioni ${OMI_DATA.periodo}${zona.ntn ? " · transazioni " + OMI_DATA.ntn_periodo : ""}${zona.solo_ottimo ? " · OMI riporta solo lo stato Ottimo per questa zona" : ""}</div>
-    `;
-    if (!document.getElementById("prezzoMq").dataset.userEdited && zona.ri_min){
-      document.getElementById("prezzoMq").value = groupInt(Math.round((zona.ri_min + (zona.ri_max || zona.ri_min))/2));
-      calcola();
+  if (prov === "MI" && (cn === "milano" || !cn)){
+    // Milano città: ricerca per via/civico con dataset dedicato.
+    const zona = cercaZona(indirizzo, "milano");
+    if (zona){
+      renderMilanoZona(box, zona);
+    } else {
+      box.classList.add("empty");
+      box.textContent = "Via non trovata nel dataset di Milano. Usa i link qui sotto, oppure prova con il solo nome della via.";
     }
   } else {
-    box.classList.add("empty");
-    box.textContent = citta && normalizza(citta) !== "milano"
-      ? "Dataset zone disponibile solo per Milano. Usa i link qui sotto per verificare manualmente."
-      : "Via non trovata nel dataset. Usa i link qui sotto per verificare manualmente, oppure prova con il solo nome della via.";
+    // Altre province / altri comuni: comune + zona (con auto-match via dove disponibile).
+    if (!cn){
+      box.classList.add("empty");
+      box.textContent = `Scrivi il comune (provincia di ${provNome(prov)}).`;
+    } else {
+      const match = cercaComune(citta, prov);
+      if (match){
+        renderProvincia(box, match, indirizzo);
+      } else {
+        box.classList.add("empty");
+        box.textContent = `Comune non trovato in provincia di ${provNome(prov)}. Controlla il nome, o cambia provincia.`;
+      }
+    }
   }
 
+  const cittaSlug = cn.replace(/\s+/g, "-") || "milano";
   linkRow.innerHTML = `
     <a href="https://www1.agenziaentrate.gov.it/servizi/Consultazione/ricerca.php" target="_blank" rel="noopener">Agenzia Entrate OMI</a>
-    <a href="https://www.immobiliare.it/vendita-case/milano/" target="_blank" rel="noopener">Immobiliare.it</a>
+    <a href="https://www.immobiliare.it/vendita-case/${cittaSlug}/" target="_blank" rel="noopener">Immobiliare.it</a>
   `;
   updateImmobileRef();
 }
@@ -259,6 +447,14 @@ function updateImmobileRef(){
 document.getElementById("indirizzo").addEventListener("input", aggiornaZona);
 document.getElementById("citta").addEventListener("input", aggiornaZona);
 document.getElementById("prezzoMq").addEventListener("input", e => e.target.dataset.userEdited = "1");
+const provinciaEl = document.getElementById("provincia");
+if (provinciaEl) provinciaEl.addEventListener("change", () => {
+  selZonaProv = null;
+  const cittaEl = document.getElementById("citta");
+  if (provinciaEl.value === "MI") cittaEl.value = "Milano";
+  else if (normComune(cittaEl.value) === "milano") cittaEl.value = "";
+  aggiornaZona();
+});
 aggiornaZona();
 
 
@@ -555,8 +751,13 @@ document.getElementById("btnReset").addEventListener("click", () => {
   ["indirizzo","descrizione","mq","prezzoMq","acquisto","notaio","geometra","speseCond","arredo","interior","corrente","ristrutturazioneMq"]
     .forEach(id => document.getElementById(id).value = "");
   document.getElementById("citta").value = "Milano";
+  if (document.getElementById("provincia")) document.getElementById("provincia").value = "MI";
+  selZonaProv = null;
+  document.getElementById("ristrutturazioneMq").value = "680";
+  document.getElementById("roiTarget").value = 30;
   document.getElementById("aliquotaImposte").value = 9;
   document.getElementById("aliquotaAgenzia").value = 4.88;
+  document.getElementById("importBanner").style.display = "none";
   delete document.getElementById("prezzoMq").dataset.userEdited;
   formatAllGrouped();
   calcola();
@@ -652,9 +853,10 @@ function renderSaved(){
       document.getElementById("arredo").value = v.arredo;
       document.getElementById("interior").value = v.interior;
       document.getElementById("corrente").value = v.corrente;
-      document.getElementById("ristrutturazioneMq").value = v.ristrutturazioneMq;
+      document.getElementById("ristrutturazioneMq").value = v.ristrutturazioneMq || "680";
       document.getElementById("aliquotaImposte").value = v.aliquotaImposte ?? 9;
       document.getElementById("aliquotaAgenzia").value = v.aliquotaAgenzia ?? 4.88;
+      document.getElementById("roiTarget").value = v.roiTarget ?? 30;
       formatAllGrouped();
       calcola();
       aggiornaZona();
@@ -670,3 +872,71 @@ function renderSaved(){
     });
   });
 }
+
+
+// ===== IMPORT DA IMMOBILIARE (parametri in URL passati dal bookmarklet) =====
+function applyImportFromUrl(){
+  const p = new URLSearchParams(location.search);
+  const mqP = p.get("mq"), prezzoP = p.get("prezzo"), addrP = p.get("addr"), cittaP = p.get("citta");
+  if (!mqP && !prezzoP && !addrP && !cittaP) return;
+  const onlyDigits = s => (s || "").replace(/[^0-9]/g, "");
+
+  if (addrP) document.getElementById("indirizzo").value = addrP.trim();
+  if (cittaP) document.getElementById("citta").value = cittaP.trim();
+  if (onlyDigits(mqP)) document.getElementById("mq").value = onlyDigits(mqP);
+  if (onlyDigits(prezzoP)) document.getElementById("acquisto").value = onlyDigits(prezzoP);
+
+  formatAllGrouped();
+  aggiornaZona();   // trova la zona e, se non toccato a mano, precompila il prezzo di vendita
+  calcola();
+
+  const parts = [];
+  if (onlyDigits(mqP)) parts.push(onlyDigits(mqP) + " mq");
+  if (onlyDigits(prezzoP)) parts.push(groupInt(parseInt(onlyDigits(prezzoP), 10)) + " € richiesti");
+  document.getElementById("importBannerTxt").textContent =
+    "Importato da Immobiliare.it" + (parts.length ? ": " + parts.join(" · ") : "") + ". Controlla i valori.";
+  document.getElementById("importBanner").style.display = "";
+
+  setTab("new");
+  showPanel("conto");
+  history.replaceState({}, "", location.pathname);   // un refresh non re-importa
+}
+document.getElementById("importBannerX").addEventListener("click", () => {
+  document.getElementById("importBanner").style.display = "none";
+});
+
+
+// ===== PULSANTE "MANDA A VISITE" (bookmarklet) =====
+// Gira DENTRO la pagina di Immobiliare.it (dove i dati ci sono e non c'è blocco anti-bot):
+// legge superficie/prezzo/indirizzo dai dati strutturati della pagina e riapre questo
+// strumento con i valori in coda all'URL. __BASE__ viene sostituito con l'URL reale del tool.
+const BOOKMARKLET_SRC = `(function(){var B="__BASE__";function d(x){return(""+x).replace(/[^0-9]/g,"");}var price=null,mq=null,addr=null,city=null;var L=document.querySelectorAll('script[type="application/ld+json"]');for(var i=0;i<L.length;i++){try{var j=JSON.parse(L[i].textContent);var ns=Array.isArray(j)?j:(j["@graph"]?j["@graph"]:[j]);for(var k=0;k<ns.length;k++){var n=ns[k];if(!n||typeof n!="object")continue;var of=n.offers;if(of){if(Array.isArray(of))of=of[0];var pv=of&&(of.price||(of.priceSpecification&&of.priceSpecification.price));if(pv&&!price)price=pv;}if(n.price&&!price)price=n.price;var fs=n.floorSize;if(fs){var fv=(typeof fs=="object")?(fs.value||fs["@value"]):fs;if(fv&&!mq)mq=fv;}if(n.address&&typeof n.address=="object"){if(n.address.streetAddress&&!addr)addr=n.address.streetAddress;if(n.address.addressLocality&&!city)city=n.address.addressLocality;}}}catch(e){}}var t=document.body?document.body.innerText:"";if(!price){var pm=t.match(/€\\s*([0-9][0-9.]{3,})/g);if(pm){for(var x=0;x<pm.length;x++){var pn=parseInt(pm[x].replace(/[^0-9]/g,""),10);if(pn>10000){price=pn;break;}}}}if(!mq){var sm=t.match(/([0-9]{1,4})\\s*m(?:²|q)(?![a-z])/ig);if(sm){var bm=0;for(var y=0;y<sm.length;y++){var sn=parseInt(sm[y].replace(/[^0-9]/g,""),10);if(sn>bm)bm=sn;}if(bm>0)mq=bm;}}price=price?d(price):"";mq=mq?d(mq):"";var Q=[];if(mq)Q.push("mq="+mq);if(price)Q.push("prezzo="+price);if(addr)Q.push("addr="+encodeURIComponent(addr));if(city)Q.push("citta="+encodeURIComponent(city));Q.push("src=imm");var u=B+"?"+Q.join("&");if(!mq&&!price)alert("Non ho trovato superficie e prezzo in questa pagina. Apro comunque lo strumento: inseriscili a mano.");var w=window.open(u,"_blank");if(!w)location.href=u;})();`;
+
+function buildBookmarklet(){
+  const base = location.origin + location.pathname;
+  return "javascript:" + BOOKMARKLET_SRC.replace("__BASE__", () => base);
+}
+
+const bmModal = document.getElementById("bmModal");
+document.getElementById("bmOpen").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("bmCode").value = buildBookmarklet();
+  bmModal.classList.remove("hidden");
+});
+document.getElementById("bmClose").addEventListener("click", () => bmModal.classList.add("hidden"));
+bmModal.addEventListener("click", (e) => { if (e.target === bmModal) bmModal.classList.add("hidden"); });
+document.getElementById("bmCopy").addEventListener("click", async () => {
+  const ta = document.getElementById("bmCode");
+  ta.focus(); ta.select();
+  let ok = false;
+  try { await navigator.clipboard.writeText(ta.value); ok = true; }
+  catch(e){ try { ok = document.execCommand("copy"); } catch(e2){} }
+  const btn = document.getElementById("bmCopy");
+  const orig = btn.textContent;
+  btn.textContent = ok ? "Copiato ✓" : "Selezionato: ora tocca Copia";
+  setTimeout(() => btn.textContent = orig, 1800);
+});
+
+
+// Import all'avvio se l'app è già sbloccata su questo dispositivo.
+if (localStorage.getItem(UNLOCK_KEY) === "1") applyImportFromUrl();

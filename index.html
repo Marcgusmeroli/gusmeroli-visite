@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 <title>Gusmeroli — Strumento Visite</title>
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -80,30 +80,53 @@
       </div>
 
       <div id="contoEconomicoCard">
+        <div id="importBanner" class="import-banner" style="display:none">
+          <span id="importBannerTxt"></span>
+          <span class="x" id="importBannerX" role="button" aria-label="Chiudi">×</span>
+        </div>
         <div class="card">
+          <div class="row2">
+            <div class="field">
+              <label>Provincia</label>
+              <select id="provincia">
+                <option value="BG">Bergamo</option>
+                <option value="BS">Brescia</option>
+                <option value="CO">Como</option>
+                <option value="CR">Cremona</option>
+                <option value="LC">Lecco</option>
+                <option value="LO">Lodi</option>
+                <option value="MN">Mantova</option>
+                <option value="MI" selected>Milano</option>
+                <option value="MB">Monza e Brianza</option>
+                <option value="PV">Pavia</option>
+                <option value="SO">Sondrio</option>
+                <option value="VA">Varese</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Comune</label>
+              <input type="text" id="citta" value="Milano" autocomplete="off" placeholder="Es. Sondrio">
+            </div>
+          </div>
           <div class="field">
             <label>Indirizzo (via e civico)</label>
             <input type="text" id="indirizzo" placeholder="Es. Via Napo Torriani 18" autocomplete="off">
           </div>
           <div class="row2">
-            <div class="field">
-              <label>Città</label>
-              <input type="text" id="citta" value="Milano" autocomplete="off">
-            </div>
             <div class="field key">
               <label>Superficie (mq)</label>
               <input type="text" id="mq" placeholder="105" inputmode="numeric">
             </div>
-          </div>
-          <div class="field">
-            <label>Progetto</label>
-            <input type="text" id="descrizione" placeholder="Es. Frazionamento in 2 bilocali">
+            <div class="field">
+              <label>Progetto</label>
+              <input type="text" id="descrizione" placeholder="Es. bilocale da rivendere">
+            </div>
           </div>
         </div>
 
         <div class="section-title">Zona &amp; quotazioni</div>
         <div class="card">
-          <div id="zoneBox" class="zone-box empty">Inserisci via e città per cercare la zona OMI</div>
+          <div id="zoneBox" class="zone-box empty">Scegli provincia e comune, poi inserisci la via per la zona OMI</div>
           <div class="linkrow" id="linkRow"></div>
         </div>
 
@@ -159,7 +182,7 @@
           </div>
           <div class="field">
             <label>Ristrutturazione (€/mq)</label>
-            <input type="text" id="ristrutturazioneMq" placeholder="680" inputmode="numeric">
+            <input type="text" id="ristrutturazioneMq" value="680" placeholder="680" inputmode="numeric">
           </div>
           <div class="calc-row">
             <div class="l">Ristrutturazione totale</div>
@@ -173,6 +196,23 @@
             <label>Prezzo di vendita stimato (€/mq)</label>
             <input type="text" id="prezzoMq" placeholder="6.700" inputmode="numeric">
           </div>
+        </div>
+
+        <div class="section-title">Prezzo da offrire</div>
+        <div class="card">
+          <div class="field">
+            <label>ROI obiettivo (%)</label>
+            <input type="number" id="roiTarget" value="30" step="1" inputmode="decimal">
+          </div>
+          <div class="offer-box">
+            <div class="offer-main">
+              <div class="l">Prezzo max d'acquisto per il ROI obiettivo</div>
+              <div class="v" id="rOfferta">—</div>
+            </div>
+            <div class="offer-sub" id="rOffertaMq">—</div>
+          </div>
+          <button type="button" class="btn-secondary" id="btnUsaOfferta">Usa come prezzo di acquisto</button>
+          <div class="hint" style="margin-top:8px">Prezzo che, comprando a quella cifra, porta il ROI esattamente al valore obiettivo. Servono la superficie e il prezzo di vendita stimato.</div>
         </div>
 
         <div class="section-title">Risultato</div>
@@ -192,8 +232,9 @@
         <button class="btn-secondary" id="btnReset">Svuota scheda</button>
 
         <div class="disclaimer">
+        <a href="#" id="bmOpen">📲 Installa il pulsante “Manda a Visite” per Immobiliare.it</a><br><br>
         Quotazioni zona: dati ufficiali Agenzia delle Entrate — OMI, 2º semestre 2025 (consultazione ufficiale), a titolo indicativo. Verificare sempre i dati aggiornati prima di una decisione d'investimento.<br>
-        <span style="opacity:.6">build 18 · OMI Milano 2º sem. 2025</span>
+        <span style="opacity:.6">build 20 · OMI Lombardia 2º sem. 2025</span>
         </div>
       </div>
     </div>
@@ -206,7 +247,24 @@
   </main>
 </div>
 
-<script src="omi-data.js?v=18"></script>
-<script src="app.js?v=26"></script>
+<div id="bmModal" class="modal hidden">
+  <div class="modal-card">
+    <h3>Pulsante “Manda a Visite”</h3>
+    <div class="modal-sub">Un preferito di Safari che, dalla pagina di un immobile su Immobiliare.it, apre questo strumento con <b>superficie</b> e <b>prezzo</b> già compilati. Si installa una volta sola.</div>
+    <ol class="modal-steps">
+      <li>Tocca <b>Copia il codice</b> qui sotto.</li>
+      <li>Vai su un annuncio qualsiasi di <b>Immobiliare.it</b>, tocca <b>Condividi</b> (↑) ▸ <b>Aggiungi ai preferiti</b> e salva.</li>
+      <li>Apri i <b>Preferiti</b> (icona libro aperto) ▸ <b>Modifica</b> ▸ tocca il preferito appena creato.</li>
+      <li>Rinominalo “<b>Manda a Visite</b>”, cancella tutto l’indirizzo e <b>incolla</b> il codice copiato. Salva.</li>
+      <li>Fatto: quando sei su un annuncio, aprilo dai Preferiti e i dati arrivano qui compilati.</li>
+    </ol>
+    <textarea class="bm-code" id="bmCode" readonly spellcheck="false"></textarea>
+    <button type="button" class="btn-primary" id="bmCopy">Copia il codice</button>
+    <button type="button" class="btn-secondary" id="bmClose">Chiudi</button>
+  </div>
+</div>
+
+<script src="omi-data.js?v=20"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
