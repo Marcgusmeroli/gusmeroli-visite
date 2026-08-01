@@ -352,24 +352,20 @@ function renderProvincia(box, com, indirizzo){
     return;
   }
 
-  // Selezione zona: manuale (chip toccato) se via invariata, altrimenti auto-match dalla via.
-  const manualeValida = selZonaProv && selZonaProv.key === com.key && selZonaProv.manual && selZonaProv.via === indirizzo;
-  if (!manualeValida){
+  // Una sola zona: quella riconosciuta dalla via (o l'unica del comune). Niente pulsanti.
+  const zi = com.zone.length === 1 ? com.zone[0] : (function(){
     const auto = matchViaZona(indirizzo, com.zone);
-    selZonaProv = { key: com.key, via: indirizzo, idx: auto >= 0 ? auto : 0, manual: false, auto: auto >= 0 };
+    return auto >= 0 ? com.zone[auto] : null;
+  })();
+
+  if (!zi){
+    box.innerHTML = `<div class="zone-name">${com.nome} <span class="zone-prov">${provNome(com.prov)}</span></div>
+      <div class="zone-hint">Scrivi via e civico per trovare la zona OMI.</div>`;
+    return;
   }
-  const idx = Math.min(selZonaProv.idx, com.zone.length - 1);
-  const zi = com.zone[idx];
-  // Aggiorna il prezzo/mq solo quando la zona è certa: auto-match, scelta a mano, o zona unica.
-  const zonaCerta = selZonaProv.manual || selZonaProv.auto || com.zone.length === 1;
-  const forcePrezzo = selZonaProv.manual || selZonaProv.auto;
 
   box.innerHTML = `
     <div class="zone-name">${com.nome} <span class="zone-prov">${provNome(com.prov)}</span></div>
-    ${com.zone.length > 1 ? `<div class="zona-chips">${com.zone.map((z,i) =>
-      `<button type="button" class="zona-chip${i === idx ? " active" : ""}" data-i="${i}">${zonaLabel(z)}</button>`).join("")}</div>` : ""}
-    ${selZonaProv.auto ? `<div class="zone-hint ok">✓ Via riconosciuta nella zona ${zi.codice}</div>`
-      : (com.zone.length > 1 ? `<div class="zone-hint">Scegli la zona, o scrivi la via per riconoscerla</div>` : "")}
     <div class="zone-scenarios">
       <div class="scen da">
         <div class="scen-lbl">Da ristrutturare</div>
@@ -382,12 +378,7 @@ function renderProvincia(box, com, indirizzo){
     </div>
     <div class="zone-src">Zona ${zi.codice} · ${zi.fascia || ""} · ${P.fonte} ${P.periodo}${zi.eco ? " · valori su abitazioni di tipo economico (civili non quotate)" : ""}</div>
   `;
-  box.querySelectorAll(".zona-chip[data-i]").forEach(b =>
-    b.addEventListener("click", () => {
-      selZonaProv = { key: com.key, via: indirizzo, idx: +b.dataset.i, manual: true, auto: false };
-      renderProvincia(box, com, indirizzo);
-    }));
-  if (zonaCerta) setPrezzoFromZona(zi, forcePrezzo);
+  setPrezzoFromZona(zi, false);
 }
 
 // Render della zona di Milano città (ricerca per via).
