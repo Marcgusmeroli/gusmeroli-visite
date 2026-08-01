@@ -208,6 +208,9 @@ main{max-width:820px;margin:0 auto;padding:22px 18px 80px;}
 .zona-chip.active{background:var(--dark);color:#fff;border-color:var(--dark);}
 .zone-box .zone-hint{font-size:12px;color:var(--sub);margin:8px 0 2px;}
 .zone-box .zone-hint.ok{color:var(--good);font-weight:600;}
+.zona-sel-row{display:flex;align-items:center;gap:10px;margin:10px 0 4px;}
+.zona-sel-row label{font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:600;color:var(--mid);}
+.zona-sel-row select{flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;color:var(--text);background:var(--white);}
 
 .linkrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 .linkrow a{
