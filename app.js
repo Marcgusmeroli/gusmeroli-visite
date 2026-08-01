@@ -352,15 +352,17 @@ function renderProvincia(box, com, indirizzo){
     return;
   }
 
-  // Una sola zona: quella riconosciuta dalla via (o l'unica del comune). Niente pulsanti.
+  // Solo la zona OMI riconosciuta dalla via (o l'unica del comune). Nessun'altra opzione.
   const zi = com.zone.length === 1 ? com.zone[0] : (function(){
-    const auto = matchViaZona(indirizzo, com.zone);
-    return auto >= 0 ? com.zone[auto] : null;
+    const a = matchViaZona(indirizzo, com.zone);
+    return a >= 0 ? com.zone[a] : null;
   })();
 
   if (!zi){
     box.innerHTML = `<div class="zone-name">${com.nome} <span class="zone-prov">${provNome(com.prov)}</span></div>
-      <div class="zone-hint">Scrivi via e civico per trovare la zona OMI.</div>`;
+      <div class="zone-hint">${indirizzo.trim()
+        ? "Via non riconosciuta nell'elenco OMI di questo comune — controlla il nome della via."
+        : "Scrivi via e civico per trovare la zona OMI."}</div>`;
     return;
   }
 
