@@ -387,7 +387,6 @@ function zonaLabel(z){
 }
 
 function renderProvincia(box, com, indirizzo){
-  box.classList.remove("empty");
   const P = OMI_DATA.province;
   if (!com.zone || !com.zone.length){
     box.classList.add("empty");
@@ -395,45 +394,34 @@ function renderProvincia(box, com, indirizzo){
     return;
   }
 
-  // Zona dalla via: 1) preciso geometrico (poligoni+OSM), 2) elenco vie OMI, 3) tendina di ripiego.
-  const single = com.zone.length === 1;
-  const geoCode = single ? null : viaZonaGeo(com.prov, com.key, indirizzo);
-  const geoIdx = geoCode ? com.zone.findIndex(z => z.codice === geoCode) : -1;
-  const auto = (geoIdx < 0 && !single) ? matchViaZona(indirizzo, com.zone) : -1;
-  const manualeValida = selZonaProv && selZonaProv.key === com.key && selZonaProv.manual;
-  let idx, autoMatched = false;
-  if (single) idx = 0;
-  else if (geoIdx >= 0){ idx = geoIdx; autoMatched = true; }
-  else if (auto >= 0){ idx = auto; autoMatched = true; }
-  else if (manualeValida) idx = selZonaProv.idx;
-  else idx = -1;   // multi-zona, via non riconosciuta e nessuna scelta: chiedi la zona
-  const zi = idx >= 0 ? com.zone[Math.min(idx, com.zone.length - 1)] : null;
+  // Nessuna via scritta: resta vuoto (risponde solo quando si dà l'indirizzo).
+  if (!(indirizzo || "").trim()){
+    box.classList.add("empty");
+    box.textContent = `${com.nome} (${provNome(com.prov)}) — scrivi la via per la zona OMI.`;
+    return;
+  }
 
-  const selHtml = (single || autoMatched) ? "" : `<div class="zona-sel-row">
-      <label>Zona</label>
-      <select id="zonaSel">
-        <option value="-1"${idx < 0 ? " selected" : ""}>— scegli la zona —</option>
-        ${com.zone.map((z,i) => `<option value="${i}"${i === idx ? " selected" : ""}>${z.codice} · ${z.fascia || ""}${z.nome && z.nome.length <= 40 ? " · " + z.nome : ""}</option>`).join("")}
-      </select>
-    </div>`;
+  // Via -> zona: 1) preciso geometrico (poligoni+OSM), 2) elenco vie OMI, 3) comune a zona unica.
+  const geoCode = viaZonaGeo(com.prov, com.key, indirizzo);
+  let zi = geoCode ? com.zone.find(z => z.codice === geoCode) : null;
+  if (!zi){ const a = matchViaZona(indirizzo, com.zone); if (a >= 0) zi = com.zone[a]; }
+  if (!zi && com.zone.length === 1) zi = com.zone[0];
 
-  const valsHtml = zi ? `
+  if (!zi){
+    box.classList.add("empty");
+    box.textContent = `Via non riconosciuta a ${com.nome}. Controlla il nome della via.`;
+    return;
+  }
+
+  box.classList.remove("empty");
+  box.innerHTML = `
+    <div class="zone-name">${com.nome} <span class="zone-prov">${provNome(com.prov)}</span></div>
     <div class="zone-scenarios">
       <div class="scen da"><div class="scen-lbl">Da ristrutturare</div><div class="scen-val">${fmtRange(zi.dr_min, zi.dr_max)}</div></div>
       <div class="scen ri"><div class="scen-lbl">Ristrutturato</div><div class="scen-val">${fmtRange(zi.ri_min, zi.ri_max)}</div></div>
     </div>
-    <div class="zone-src">Zona ${zi.codice} · ${zi.fascia || ""} · ${P.fonte} ${P.periodo}${zi.eco ? " · valori su abitazioni di tipo economico (civili non quotate)" : ""}</div>`
-    : `<div class="zone-hint">Comune diviso in ${com.zone.length} zone: scrivi la via, o scegli la zona qui sopra.</div>`;
-
-  box.innerHTML = `<div class="zone-name">${com.nome} <span class="zone-prov">${provNome(com.prov)}</span></div>${selHtml}${valsHtml}`;
-
-  const zs = document.getElementById("zonaSel");
-  if (zs) zs.addEventListener("change", () => {
-    const v = +zs.value;
-    selZonaProv = v >= 0 ? { key: com.key, idx: v, manual: true } : null;
-    renderProvincia(box, com, indirizzo);
-  });
-  setPrezzoFromZona(zi, autoMatched || manualeValida);
+    <div class="zone-src">Zona ${zi.codice} · ${zi.fascia || ""} · ${P.fonte} ${P.periodo}${zi.eco ? " · valori su abitazioni di tipo economico (civili non quotate)" : ""}</div>`;
+  setPrezzoFromZona(zi, false);
 }
 
 // Render della zona di Milano città (ricerca per via).
