@@ -324,6 +324,49 @@ function matchViaZona(indirizzo, zone){
   return (bestScore > 0 && ties === 1) ? best : -1;
 }
 
+// ===== VIA -> ZONA PRECISA (geometrico: poligoni OMI + strade OSM, come il sito AdE) =====
+// Tabelle per provincia caricate a richiesta da streetzone/<PROV>.json = { comuneKey: { via_norm: "B1" } }.
+const OMI_STREETZONE = {};
+function loadStreetzone(prov){
+  if (!prov || OMI_STREETZONE[prov] !== undefined) return;   // già caricata o in corso
+  OMI_STREETZONE[prov] = "loading";
+  fetch(`streetzone/${prov}.json?v=1`)
+    .then(r => r.ok ? r.json() : {})
+    .then(d => { OMI_STREETZONE[prov] = d; aggiornaZona(); })
+    .catch(() => { OMI_STREETZONE[prov] = {}; });
+}
+function szData(prov){ const d = OMI_STREETZONE[prov]; return (d && d !== "loading") ? d : null; }
+
+// Normalizza la via come nel build (toglie il tipo via iniziale e il civico finale).
+function normViaGeo(s){
+  let v = (s || "").replace(/\s+\d+\s*[a-z]?\s*$/i, "");   // togli civico finale
+  v = v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  v = v.replace(/^(via|viale|vicolo|corso|piazza|piazzale|largo|localita|loc|frazione|strada|contrada|salita|passaggio|ripa|foro|alzaia|galleria|vico|lungolago|lungolario|lungo)\b\.?\s*/, "");
+  return v.replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// Ritorna il codice zona (es. "B1") della via nel comune, dal dataset geometrico; null se assente.
+function viaZonaGeo(prov, comKey, indirizzo){
+  const d = szData(prov); if (!d) return null;
+  const map = d[comKey] || d[(comKey || "").split("|")[0]];
+  if (!map) return null;
+  const nv = normViaGeo(indirizzo);
+  if (!nv) return null;
+  if (map[nv]) return map[nv];   // match esatto
+  // OSM usa nomi completi ("cavour" -> "camillo benso conte di cavour"): match per parole.
+  const qt = nv.split(" ").filter(t => t.length >= 3);
+  if (!qt.length) return null;
+  const codes = new Set(); let hit = null;
+  for (const k in map){
+    const kt = k.split(" ");
+    if (qt.every(q => kt.some(w => w === q || w.startsWith(q)))){
+      hit = map[k]; codes.add(hit);
+      if (codes.size > 1) return null;   // via ambigua tra più zone
+    }
+  }
+  return codes.size === 1 ? hit : null;
+}
+
 function setPrezzoFromZona(z, force){
   const el = document.getElementById("prezzoMq");
   if (!z) return;
@@ -352,15 +395,18 @@ function renderProvincia(box, com, indirizzo){
     return;
   }
 
-  // Zona riconosciuta dalla via -> solo quella. Se la via non basta (o non c'è), tendina di ripiego.
+  // Zona dalla via: 1) preciso geometrico (poligoni+OSM), 2) elenco vie OMI, 3) tendina di ripiego.
   const single = com.zone.length === 1;
-  const auto = single ? -1 : matchViaZona(indirizzo, com.zone);
+  const geoCode = single ? null : viaZonaGeo(com.prov, com.key, indirizzo);
+  const geoIdx = geoCode ? com.zone.findIndex(z => z.codice === geoCode) : -1;
+  const auto = (geoIdx < 0 && !single) ? matchViaZona(indirizzo, com.zone) : -1;
   const manualeValida = selZonaProv && selZonaProv.key === com.key && selZonaProv.manual;
   let idx, autoMatched = false;
   if (single) idx = 0;
+  else if (geoIdx >= 0){ idx = geoIdx; autoMatched = true; }
   else if (auto >= 0){ idx = auto; autoMatched = true; }
   else if (manualeValida) idx = selZonaProv.idx;
-  else idx = -1;   // multi-zona, nessuna via riconosciuta e nessuna scelta: chiedi la zona
+  else idx = -1;   // multi-zona, via non riconosciuta e nessuna scelta: chiedi la zona
   const zi = idx >= 0 ? com.zone[Math.min(idx, com.zone.length - 1)] : null;
 
   const selHtml = (single || autoMatched) ? "" : `<div class="zona-sel-row">
@@ -434,7 +480,8 @@ function aggiornaZona(){
       box.textContent = "Via non trovata nel dataset di Milano. Usa i link qui sotto, oppure prova con il solo nome della via.";
     }
   } else {
-    // Altre province / altri comuni: comune + zona (con auto-match via dove disponibile).
+    // Altre province / altri comuni: comune + zona (via -> zona esatta dove disponibile).
+    loadStreetzone(prov);   // carica la tabella via->zona della provincia (lazy)
     if (!cn){
       box.classList.add("empty");
       box.textContent = `Scrivi il comune (provincia di ${provNome(prov)}).`;
